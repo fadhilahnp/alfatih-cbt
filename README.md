@@ -53,7 +53,8 @@ Aplikasi Computer-Based Test (CBT) berbasis web modern yang dibangun dengan **No
   - Tombol aksi admin: Buka Kunci Siswa (*Unlock*), Paksa Selesai (*Force Finish*), Ambil Foto Sekarang (*Remote Snapshot*), dan Kirim Pesan Peringatan ke Layar Siswa.
 * **📊 Rekapitulasi & Ekspor Nilai ke Excel**:
   - Rekap perolehan nilai, jumlah benar, salah, kosong, dan riwayat pelanggaran.
-  - Ekspor seluruh nilai peserta ujian ke file spreadsheet Excel (.xlsx).
+  - Filter nilai berdasarkan mata pelajaran, jadwal ujian, dan kelas; peringkat serta jumlah peserta mengikuti filter kelas.
+  - Ekspor nilai peserta ke file spreadsheet Excel (.xlsx), termasuk ekspor khusus kelas yang sedang dipilih.
 
 ---
 

@@ -775,6 +775,8 @@ router.get('/monitoring/snapshots/:scheduleId/:studentId', (req, res) => {
 // ==========================================
 router.get('/results/:scheduleId', (req, res) => {
   const { scheduleId } = req.params;
+  const requestedClass = typeof req.query.class_name === 'string' ? req.query.class_name.trim() : '';
+  const className = requestedClass && requestedClass !== 'ALL' ? requestedClass : null;
 
   const schedule = db.prepare(`
     SELECT es.*, qb.subject, qb.total_questions
@@ -785,17 +787,33 @@ router.get('/results/:scheduleId', (req, res) => {
 
   if (!schedule) return res.status(404).json({ success: false, message: 'Jadwal tidak ditemukan.' });
 
-  const results = db.prepare(`
+  let resultsQuery = `
     SELECT ses.*, s.nis, s.name as student_name, s.class_name, s.room_name
     FROM student_exam_sessions ses
     JOIN students s ON ses.student_id = s.id
     WHERE ses.schedule_id = ?
-    ORDER BY ses.score DESC, ses.violation_count ASC
-  `).all(scheduleId);
+  `;
+  const resultParams = [scheduleId];
+
+  if (className) {
+    resultsQuery += ' AND s.class_name = ?';
+    resultParams.push(className);
+  }
+
+  resultsQuery += ' ORDER BY ses.score DESC, ses.violation_count ASC';
+  const results = db.prepare(resultsQuery).all(...resultParams);
+  const classes = db.prepare(`
+    SELECT DISTINCT s.class_name
+    FROM student_exam_sessions ses
+    JOIN students s ON ses.student_id = s.id
+    WHERE ses.schedule_id = ?
+    ORDER BY s.class_name ASC
+  `).all(scheduleId).map(row => row.class_name);
 
   return res.json({
     success: true,
     schedule,
+    classes,
     data: results
   });
 });
@@ -803,6 +821,8 @@ router.get('/results/:scheduleId', (req, res) => {
 // Export Nilai ke Excel
 router.get('/results/:scheduleId/export-excel', (req, res) => {
   const { scheduleId } = req.params;
+  const requestedClass = typeof req.query.class_name === 'string' ? req.query.class_name.trim() : '';
+  const className = requestedClass && requestedClass !== 'ALL' ? requestedClass : null;
 
   const schedule = db.prepare(`
     SELECT es.*, qb.subject
@@ -813,7 +833,7 @@ router.get('/results/:scheduleId/export-excel', (req, res) => {
 
   if (!schedule) return res.status(404).send('Jadwal tidak ditemukan');
 
-  const results = db.prepare(`
+  let resultsQuery = `
     SELECT s.nis as NIS, s.name as "Nama Siswa", s.class_name as Kelas,
            ses.score as "Nilai Akhir", ses.correct_count as "Benar",
            ses.wrong_count as "Salah", ses.unanswered_count as "Kosong",
@@ -822,8 +842,16 @@ router.get('/results/:scheduleId/export-excel', (req, res) => {
     FROM student_exam_sessions ses
     JOIN students s ON ses.student_id = s.id
     WHERE ses.schedule_id = ?
-    ORDER BY ses.score DESC
-  `).all(scheduleId);
+  `;
+  const resultParams = [scheduleId];
+
+  if (className) {
+    resultsQuery += ' AND s.class_name = ?';
+    resultParams.push(className);
+  }
+
+  resultsQuery += ' ORDER BY ses.score DESC';
+  const results = db.prepare(resultsQuery).all(...resultParams);
 
   const ws = xlsx.utils.json_to_sheet(results);
   const wb = xlsx.utils.book_new();
@@ -831,8 +859,9 @@ router.get('/results/:scheduleId/export-excel', (req, res) => {
 
   const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
   const sanitizedTitle = (schedule.title || 'Ujian').replace(/[^a-zA-Z0-9]/g, '_');
+  const classSuffix = className ? `_${className.replace(/[^a-zA-Z0-9]/g, '_')}` : '';
 
-  res.setHeader('Content-Disposition', `attachment; filename="Nilai_${sanitizedTitle}.xlsx"`);
+  res.setHeader('Content-Disposition', `attachment; filename="Nilai_${sanitizedTitle}${classSuffix}.xlsx"`);
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   return res.send(buffer);
 });

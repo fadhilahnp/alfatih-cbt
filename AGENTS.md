@@ -2,7 +2,7 @@
 
 > Titik awal untuk perbaikan atau penambahan fitur tanpa memindai seluruh kode berulang kali.
 >
-> Terakhir diverifikasi terhadap implementasi: **18 November 2026**.
+> Terakhir diverifikasi terhadap implementasi: **19 November 2026**.
 
 ## Cara menggunakan dokumen ini
 
@@ -167,7 +167,7 @@ Sumber: `routes/admin.js`, prefix `/api/admin`, semuanya wajib sesi admin. UI ya
 | Monitoring | `GET /monitoring/:scheduleId` |
 | Aksi proktor | `POST /monitoring/unlock`, `/monitoring/force-finish`, `/monitoring/request-snapshot`, `/monitoring/send-warning` |
 | Galeri | `GET /monitoring/snapshots/:scheduleId/:studentId` |
-| Nilai | `GET /results/:scheduleId`, `GET /results/:scheduleId/export-excel` |
+| Nilai | `GET /results/:scheduleId?class_name=`, `GET /results/:scheduleId/export-excel?class_name=`; filter kelas opsional, response rekap juga berisi daftar `classes` peserta |
 
 Catatan kontrak admin:
 

@@ -47,12 +47,29 @@
 
       <div class="page-content">
         <div class="card" style="margin-bottom: 20px;">
-          <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
-            <label style="font-size: 13px; font-weight: 700;">Pilih Jadwal Ujian:</label>
-            <select id="resultScheduleSelect" class="form-select" style="max-width: 400px;" onchange="loadResults(this.value)">
-              <option value="">Memuat daftar ujian...</option>
-            </select>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
+            <div>
+              <label for="resultSubjectSelect" class="form-label">Mata Pelajaran</label>
+              <select id="resultSubjectSelect" class="form-select" onchange="handleSubjectChange()" disabled>
+                <option value="">Memuat mata pelajaran...</option>
+              </select>
+            </div>
+            <div>
+              <label for="resultScheduleSelect" class="form-label">Jadwal Ujian</label>
+              <select id="resultScheduleSelect" class="form-select" onchange="handleScheduleChange(this.value)" disabled>
+                <option value="">Memuat daftar ujian...</option>
+              </select>
+            </div>
+            <div>
+              <label for="resultClassSelect" class="form-label">Kelas</label>
+              <select id="resultClassSelect" class="form-select" onchange="handleClassChange()" disabled>
+                <option value="ALL">Semua Kelas</option>
+              </select>
+            </div>
           </div>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 12px;">
+            Pilih mata pelajaran dan jadwal, lalu pilih kelas untuk menampilkan nilai khusus kelas tersebut.
+          </p>
         </div>
 
         <div class="card">
@@ -92,60 +109,155 @@
 
   <script src="/js/admin.js"></script>
   <script>
+    let allSchedules = [];
     let activeScheduleId = null;
+    let resultsRequestSequence = 0;
+
+    function setResultsMessage(message) {
+      const tbody = document.getElementById('resultsTableBody');
+      tbody.innerHTML = '';
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 10;
+      td.style.textAlign = 'center';
+      td.style.color = 'var(--text-muted)';
+      td.style.padding = '30px';
+      td.textContent = message;
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    }
+
+    function updateClassOptions(classes, selectedClass = 'ALL') {
+      const classSelect = document.getElementById('resultClassSelect');
+      classSelect.innerHTML = '<option value="ALL">Semua Kelas</option>';
+
+      classes.forEach(className => {
+        const option = document.createElement('option');
+        option.value = className;
+        option.textContent = className;
+        classSelect.appendChild(option);
+      });
+
+      classSelect.value = selectedClass === 'ALL' || classes.includes(selectedClass) ? selectedClass : 'ALL';
+    }
 
     async function loadSchedules() {
       try {
         const res = await fetch('/api/admin/schedules');
         const json = await res.json();
-        const sel = document.getElementById('resultScheduleSelect');
-        sel.innerHTML = '';
+        if (!res.ok || !json.success) throw new Error(json.message || 'Gagal memuat jadwal');
 
-        if (json.data.length === 0) {
-          sel.innerHTML = '<option value="">Belum ada jadwal ujian</option>';
+        allSchedules = Array.isArray(json.data) ? json.data : [];
+        const subjectSelect = document.getElementById('resultSubjectSelect');
+        const subjects = [...new Set(allSchedules.map(schedule => schedule.subject).filter(Boolean))]
+          .sort((a, b) => a.localeCompare(b, 'id'));
+
+        subjectSelect.innerHTML = '';
+        subjects.forEach(subject => {
+          const option = document.createElement('option');
+          option.value = subject;
+          option.textContent = subject;
+          subjectSelect.appendChild(option);
+        });
+
+        if (subjects.length === 0) {
+          subjectSelect.innerHTML = '<option value="">Belum ada mata pelajaran</option>';
+          document.getElementById('resultScheduleSelect').innerHTML = '<option value="">Belum ada jadwal ujian</option>';
+          setResultsMessage('Belum ada jadwal ujian untuk ditampilkan.');
+          document.getElementById('exportExcelBtn').disabled = true;
           return;
         }
 
-        json.data.forEach(s => {
-          const opt = document.createElement('option');
-          opt.value = s.id;
-          opt.textContent = `${s.title} (${s.subject})`;
-          sel.appendChild(opt);
-        });
-
-        activeScheduleId = json.data[0].id;
-        sel.value = activeScheduleId;
-        await loadResults(activeScheduleId);
-
-      } catch (e) {
+        subjectSelect.disabled = false;
+        document.getElementById('resultScheduleSelect').disabled = false;
+        document.getElementById('exportExcelBtn').disabled = false;
+        await handleSubjectChange();
+      } catch (error) {
         showToast('Gagal memuat jadwal', 'danger');
+        setResultsMessage('Gagal memuat daftar jadwal ujian.');
       }
     }
 
+    async function handleSubjectChange() {
+      const subject = document.getElementById('resultSubjectSelect').value;
+      const scheduleSelect = document.getElementById('resultScheduleSelect');
+      const schedules = allSchedules.filter(schedule => schedule.subject === subject);
+
+      scheduleSelect.innerHTML = '';
+      schedules.forEach(schedule => {
+        const option = document.createElement('option');
+        option.value = schedule.id;
+        option.textContent = schedule.title;
+        scheduleSelect.appendChild(option);
+      });
+
+      activeScheduleId = null;
+      updateClassOptions([]);
+      document.getElementById('resultClassSelect').disabled = true;
+
+      if (schedules.length === 0) {
+        scheduleSelect.innerHTML = '<option value="">Belum ada jadwal untuk mapel ini</option>';
+        setResultsMessage('Belum ada jadwal ujian untuk mata pelajaran ini.');
+        document.getElementById('totalParticipantsCount').textContent = '0 Peserta';
+        return;
+      }
+
+      scheduleSelect.value = schedules[0].id;
+      await loadResults(schedules[0].id);
+    }
+
+    async function handleScheduleChange(scheduleId) {
+      updateClassOptions([]);
+      document.getElementById('resultClassSelect').disabled = true;
+      await loadResults(scheduleId);
+    }
+
+    async function handleClassChange() {
+      if (activeScheduleId) await loadResults(activeScheduleId);
+    }
+
     async function loadResults(scheduleId) {
-      if (!scheduleId) return;
+      if (!scheduleId) {
+        activeScheduleId = null;
+        setResultsMessage('Pilih jadwal ujian di atas untuk melihat nilai.');
+        return;
+      }
+
+      const requestSequence = ++resultsRequestSequence;
       activeScheduleId = scheduleId;
+      const classSelect = document.getElementById('resultClassSelect');
+      const selectedClass = classSelect.value || 'ALL';
       const tbody = document.getElementById('resultsTableBody');
+      setResultsMessage('Memuat data nilai...');
 
       try {
-        const res = await fetch(`/api/admin/results/${scheduleId}`);
+        const query = selectedClass !== 'ALL' ? `?class_name=${encodeURIComponent(selectedClass)}` : '';
+        const res = await fetch(`/api/admin/results/${scheduleId}${query}`);
         const json = await res.json();
+        if (requestSequence !== resultsRequestSequence) return;
 
-        if (!json.success) {
-          showToast(json.message, 'danger');
+        if (!res.ok || !json.success) {
+          showToast(json.message || 'Gagal memuat rekap nilai', 'danger');
+          setResultsMessage(json.message || 'Gagal memuat rekap nilai.');
           return;
         }
 
         const sch = json.schedule;
-        const results = json.data;
+        const results = Array.isArray(json.data) ? json.data : [];
+        const classes = Array.isArray(json.classes)
+          ? json.classes
+          : [...new Set(results.map(result => result.class_name))];
+        updateClassOptions(classes, selectedClass);
+        classSelect.disabled = false;
 
+        const classLabel = selectedClass === 'ALL' ? 'Semua Kelas' : `Kelas ${selectedClass}`;
         document.getElementById('resultsTableTitle').textContent = `Rekap Nilai: ${sch.title}`;
-        document.getElementById('resultsSubTitle').textContent = `Mata Pelajaran: ${sch.subject} • Total Soal: ${sch.total_questions}`;
+        document.getElementById('resultsSubTitle').textContent = `Mata Pelajaran: ${sch.subject} • ${classLabel} • Total Soal: ${sch.total_questions}`;
         document.getElementById('totalParticipantsCount').textContent = `${results.length} Peserta`;
 
         tbody.innerHTML = '';
         if (results.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 30px;">Belum ada peserta yang mengikuti ujian ini.</td></tr>';
+          setResultsMessage('Tidak ada data nilai untuk jadwal dan kelas yang dipilih.');
           return;
         }
 
@@ -182,9 +294,10 @@
           `;
           tbody.appendChild(tr);
         });
-
-      } catch (err) {
+      } catch (error) {
+        if (requestSequence !== resultsRequestSequence) return;
         showToast('Gagal memuat rekap nilai', 'danger');
+        setResultsMessage('Gagal memuat rekap nilai. Silakan coba lagi.');
       }
     }
 
@@ -193,7 +306,10 @@
         showToast('Pilih jadwal ujian terlebih dahulu', 'warning');
         return;
       }
-      window.location.href = `/api/admin/results/${activeScheduleId}/export-excel`;
+
+      const selectedClass = document.getElementById('resultClassSelect').value || 'ALL';
+      const query = selectedClass !== 'ALL' ? `?class_name=${encodeURIComponent(selectedClass)}` : '';
+      window.location.href = `/api/admin/results/${activeScheduleId}/export-excel${query}`;
     }
 
     window.addEventListener('DOMContentLoaded', loadSchedules);
