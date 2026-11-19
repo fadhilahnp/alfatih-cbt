@@ -4,11 +4,230 @@ const multer = require('multer');
 const xlsx = require('xlsx');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const db = require('../db/database');
 const { requireAdmin } = require('./auth');
 
 // Multer upload in memory for excel parsing
 const upload = multer({ storage: multer.memoryStorage() });
+
+const questionUploadDir = path.join(__dirname, '../public/uploads/questions');
+fs.mkdirSync(questionUploadDir, { recursive: true });
+
+const QUESTION_COLUMNS = [
+  'question_text', 'question_image', 'question_audio', 'youtube_url',
+  'option_a', 'option_a_image', 'option_b', 'option_b_image',
+  'option_c', 'option_c_image', 'option_d', 'option_d_image',
+  'option_e', 'option_e_image', 'correct_answer', 'weight'
+];
+const QUESTION_FILE_COLUMNS = [
+  'question_image', 'question_audio', 'option_a_image', 'option_b_image',
+  'option_c_image', 'option_d_image', 'option_e_image'
+];
+const QUESTION_MEDIA_FIELDS = {
+  question_image_file: { column: 'question_image', type: 'image' },
+  question_audio_file: { column: 'question_audio', type: 'audio' },
+  option_a_image_file: { column: 'option_a_image', type: 'image' },
+  option_b_image_file: { column: 'option_b_image', type: 'image' },
+  option_c_image_file: { column: 'option_c_image', type: 'image' },
+  option_d_image_file: { column: 'option_d_image', type: 'image' },
+  option_e_image_file: { column: 'option_e_image', type: 'image' }
+};
+const MEDIA_EXTENSIONS = {
+  image: new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']),
+  audio: new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac'])
+};
+
+const questionMediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: Object.keys(QUESTION_MEDIA_FIELDS).length },
+  fileFilter: (req, file, cb) => {
+    const config = QUESTION_MEDIA_FIELDS[file.fieldname];
+    const extension = path.extname(file.originalname).toLowerCase();
+    if (!config || !MEDIA_EXTENSIONS[config.type].has(extension)) {
+      return cb(new Error('Format file tidak didukung. Gambar: JPG/PNG/GIF/WebP; audio: MP3/WAV/OGG/M4A/AAC.'));
+    }
+
+    const genericMime = file.mimetype === 'application/octet-stream';
+    const validImageMime = /^image\/(jpeg|png|gif|webp)$/.test(file.mimetype);
+    const validAudioMime = /^(audio\/(mpeg|mp3|wav|x-wav|ogg|mp4|x-m4a|aac)|video\/mp4|application\/ogg)$/.test(file.mimetype);
+    if (!genericMime && !(config.type === 'image' ? validImageMime : validAudioMime)) {
+      return cb(new Error('Tipe MIME file tidak sesuai dengan media yang dipilih.'));
+    }
+    cb(null, true);
+  }
+}).fields(Object.keys(QUESTION_MEDIA_FIELDS).map(name => ({ name, maxCount: 1 })));
+
+function parseQuestionMedia(req, res, next) {
+  questionMediaUpload(req, res, err => {
+    if (!err) return next();
+    let message = err.message;
+    if (err.code === 'LIMIT_FILE_SIZE') message = 'Ukuran setiap file maksimal 10 MB.';
+    if (err.code === 'LIMIT_FILE_COUNT') message = 'Terlalu banyak file media dalam satu soal.';
+    return res.status(400).json({ success: false, message });
+  });
+}
+
+function questionValidationError(message) {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
+}
+
+function textValue(value) {
+  return value === undefined || value === null ? '' : String(value).trim();
+}
+
+function normalizeMediaUrl(value, label) {
+  const raw = textValue(value);
+  if (!raw) return '';
+  if (raw.length > 2048) throw questionValidationError(`URL ${label} terlalu panjang.`);
+
+  const localPrefix = '/uploads/questions/';
+  if (raw.startsWith(localPrefix)) {
+    const fileName = raw.slice(localPrefix.length);
+    if (!fileName || fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
+      throw questionValidationError(`URL ${label} lokal tidak valid.`);
+    }
+    return raw;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch (err) {
+    throw questionValidationError(`URL ${label} harus berupa alamat HTTP/HTTPS yang valid.`);
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw questionValidationError(`URL ${label} hanya boleh menggunakan HTTP atau HTTPS.`);
+  }
+  return parsed.toString();
+}
+
+function normalizeYouTubeUrl(value) {
+  const raw = textValue(value);
+  if (!raw) return '';
+
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch (err) {
+    throw questionValidationError('Link YouTube tidak valid.');
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw questionValidationError('Link YouTube hanya boleh menggunakan HTTP atau HTTPS.');
+  }
+
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+  const pathParts = parsed.pathname.split('/').filter(Boolean);
+  let videoId = '';
+  if (host === 'youtu.be') {
+    videoId = pathParts[0] || '';
+  } else if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
+    if (parsed.pathname === '/watch') videoId = parsed.searchParams.get('v') || '';
+    if (['embed', 'shorts', 'live'].includes(pathParts[0])) videoId = pathParts[1] || '';
+  } else if (host === 'youtube-nocookie.com' || host.endsWith('.youtube-nocookie.com')) {
+    if (pathParts[0] === 'embed') videoId = pathParts[1] || '';
+  }
+
+  if (!/^[A-Za-z0-9_-]{11}$/.test(videoId)) {
+    throw questionValidationError('Link YouTube harus berisi ID video yang valid.');
+  }
+  return `https://www.youtube.com/watch?v=${videoId}`;
+}
+
+function removeLocalQuestionMedia(values) {
+  for (const value of values) {
+    if (!value || !value.startsWith('/uploads/questions/')) continue;
+    const fileName = path.basename(value);
+    if (value !== `/uploads/questions/${fileName}`) continue;
+    try {
+      fs.unlinkSync(path.join(questionUploadDir, fileName));
+    } catch (err) {
+      if (err.code !== 'ENOENT') console.warn('Gagal menghapus media soal:', err.message);
+    }
+  }
+}
+
+function questionFilePaths(question) {
+  return QUESTION_FILE_COLUMNS.map(column => question[column]).filter(Boolean);
+}
+
+function saveQuestionFile(file, config) {
+  const maxSize = config.type === 'image' ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
+  if (file.size > maxSize) {
+    throw questionValidationError(`${config.type === 'image' ? 'Gambar' : 'Audio'} melebihi batas ${config.type === 'image' ? '5' : '10'} MB.`);
+  }
+  const extension = path.extname(file.originalname).toLowerCase();
+  const fileName = `${Date.now()}-${crypto.randomUUID()}${extension}`;
+  fs.writeFileSync(path.join(questionUploadDir, fileName), file.buffer);
+  return `/uploads/questions/${fileName}`;
+}
+
+function buildQuestionData(source, files = {}) {
+  const filesByColumn = {};
+  for (const [fieldName, config] of Object.entries(QUESTION_MEDIA_FIELDS)) {
+    const file = files[fieldName]?.[0];
+    if (file) filesByColumn[config.column] = { file, config };
+  }
+
+  const data = {
+    question_text: textValue(source.question_text),
+    question_image: normalizeMediaUrl(filesByColumn.question_image ? '' : source.question_image, 'gambar soal'),
+    question_audio: normalizeMediaUrl(filesByColumn.question_audio ? '' : source.question_audio, 'audio soal'),
+    youtube_url: normalizeYouTubeUrl(source.youtube_url),
+    correct_answer: textValue(source.correct_answer).toUpperCase()
+  };
+
+  const weight = Number(source.weight);
+  data.weight = Number.isFinite(weight) && weight > 0 ? weight : 1.0;
+
+  for (const key of ['a', 'b', 'c', 'd', 'e']) {
+    const imageColumn = `option_${key}_image`;
+    data[`option_${key}`] = textValue(source[`option_${key}`]);
+    data[imageColumn] = normalizeMediaUrl(
+      filesByColumn[imageColumn] ? '' : source[imageColumn],
+      `gambar opsi ${key.toUpperCase()}`
+    );
+  }
+
+  if (!data.question_text && !data.question_image && !data.question_audio && !data.youtube_url &&
+      !filesByColumn.question_image && !filesByColumn.question_audio) {
+    throw questionValidationError('Soal wajib memiliki teks, gambar, audio, atau link YouTube.');
+  }
+  for (const key of ['a', 'b', 'c', 'd']) {
+    const imageColumn = `option_${key}_image`;
+    if (!data[`option_${key}`] && !data[imageColumn] && !filesByColumn[imageColumn]) {
+      throw questionValidationError(`Pilihan ${key.toUpperCase()} wajib memiliki teks atau gambar.`);
+    }
+  }
+  if (!['A', 'B', 'C', 'D', 'E'].includes(data.correct_answer)) {
+    throw questionValidationError('Kunci jawaban harus berupa A, B, C, D, atau E.');
+  }
+  const correctKey = data.correct_answer.toLowerCase();
+  const correctImageColumn = `option_${correctKey}_image`;
+  if (!data[`option_${correctKey}`] && !data[correctImageColumn] && !filesByColumn[correctImageColumn]) {
+    throw questionValidationError(`Kunci ${data.correct_answer} tidak dapat dipakai karena pilihan tersebut kosong.`);
+  }
+
+  const savedPaths = [];
+  try {
+    for (const [column, media] of Object.entries(filesByColumn)) {
+      const publicPath = saveQuestionFile(media.file, media.config);
+      data[column] = publicPath;
+      savedPaths.push(publicPath);
+    }
+  } catch (err) {
+    removeLocalQuestionMedia(savedPaths);
+    throw err;
+  }
+
+  return { data, savedPaths };
+}
+
+function questionValues(data) {
+  return QUESTION_COLUMNS.map(column => data[column]);
+}
 
 // Apply requireAdmin to all routes in this router
 router.use(requireAdmin);
@@ -341,7 +560,10 @@ router.post('/banks', (req, res) => {
 
 router.delete('/banks/:id', (req, res) => {
   const { id } = req.params;
+  const mediaPaths = db.prepare('SELECT * FROM questions WHERE bank_id = ?').all(id)
+    .flatMap(questionFilePaths);
   db.prepare('DELETE FROM question_banks WHERE id = ?').run(id);
+  removeLocalQuestionMedia(mediaPaths);
   return res.json({ success: true, message: 'Bank soal berhasil dihapus.' });
 });
 
@@ -356,49 +578,62 @@ router.get('/banks/:bankId/questions', (req, res) => {
 });
 
 // Tambah Soal Manual
-router.post('/banks/:bankId/questions', (req, res) => {
+router.post('/banks/:bankId/questions', parseQuestionMedia, (req, res) => {
   const { bankId } = req.params;
-  const { question_text, option_a, option_b, option_c, option_d, option_e, correct_answer, weight } = req.body;
+  const bank = db.prepare('SELECT id FROM question_banks WHERE id = ?').get(bankId);
+  if (!bank) return res.status(404).json({ success: false, message: 'Bank soal tidak ditemukan.' });
 
-  if (!question_text || !option_a || !option_b || !option_c || !option_d || !correct_answer) {
-    return res.status(400).json({ success: false, message: 'Pertanyaan, pilihan A-D, dan kunci jawaban wajib diisi.' });
+  let savedPaths = [];
+  try {
+    const built = buildQuestionData(req.body, req.files || {});
+    savedPaths = built.savedPaths;
+    const currentMax = db.prepare('SELECT MAX(question_number) as max_num FROM questions WHERE bank_id = ?').get(bankId);
+    const nextNum = (currentMax?.max_num || 0) + 1;
+    const placeholders = QUESTION_COLUMNS.map(() => '?').join(', ');
+    const info = db.prepare(`
+      INSERT INTO questions (bank_id, question_number, ${QUESTION_COLUMNS.join(', ')})
+      VALUES (?, ?, ${placeholders})
+    `).run(bankId, nextNum, ...questionValues(built.data));
+
+    db.prepare('UPDATE question_banks SET total_questions = (SELECT COUNT(*) FROM questions WHERE bank_id = ?) WHERE id = ?').run(bankId, bankId);
+    return res.json({ success: true, message: 'Soal berhasil ditambahkan.', id: info.lastInsertRowid });
+  } catch (err) {
+    removeLocalQuestionMedia(savedPaths);
+    return res.status(err.statusCode || 500).json({ success: false, message: 'Gagal menyimpan soal: ' + err.message });
   }
-
-  const currentMax = db.prepare('SELECT MAX(question_number) as max_num FROM questions WHERE bank_id = ?').get(bankId);
-  const nextNum = (currentMax?.max_num || 0) + 1;
-
-  const info = db.prepare(`
-    INSERT INTO questions (bank_id, question_number, question_text, option_a, option_b, option_c, option_d, option_e, correct_answer, weight)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(bankId, nextNum, question_text, option_a, option_b, option_c, option_d, option_e || '', correct_answer.toUpperCase(), weight || 1.0);
-
-  // Update total questions in bank
-  db.prepare('UPDATE question_banks SET total_questions = (SELECT COUNT(*) FROM questions WHERE bank_id = ?) WHERE id = ?').run(bankId, bankId);
-
-  return res.json({ success: true, message: 'Soal berhasil ditambahkan.', id: info.lastInsertRowid });
 });
 
 // Edit Soal
-router.put('/questions/:id', (req, res) => {
+router.put('/questions/:id', parseQuestionMedia, (req, res) => {
   const { id } = req.params;
-  const { question_text, option_a, option_b, option_c, option_d, option_e, correct_answer, weight } = req.body;
+  const existing = db.prepare('SELECT * FROM questions WHERE id = ?').get(id);
+  if (!existing) return res.status(404).json({ success: false, message: 'Soal tidak ditemukan.' });
 
-  db.prepare(`
-    UPDATE questions
-    SET question_text = ?, option_a = ?, option_b = ?, option_c = ?, option_d = ?, option_e = ?, correct_answer = ?, weight = ?
-    WHERE id = ?
-  `).run(question_text, option_a, option_b, option_c, option_d, option_e || '', correct_answer.toUpperCase(), weight || 1.0, id);
+  let savedPaths = [];
+  try {
+    const built = buildQuestionData(req.body, req.files || {});
+    savedPaths = built.savedPaths;
+    const assignments = QUESTION_COLUMNS.map(column => `${column} = ?`).join(', ');
+    db.prepare(`UPDATE questions SET ${assignments} WHERE id = ?`)
+      .run(...questionValues(built.data), id);
 
-  return res.json({ success: true, message: 'Soal berhasil diperbarui.' });
+    const retainedPaths = new Set(questionFilePaths(built.data));
+    removeLocalQuestionMedia(questionFilePaths(existing).filter(mediaPath => !retainedPaths.has(mediaPath)));
+    return res.json({ success: true, message: 'Soal berhasil diperbarui.' });
+  } catch (err) {
+    removeLocalQuestionMedia(savedPaths);
+    return res.status(err.statusCode || 500).json({ success: false, message: 'Gagal memperbarui soal: ' + err.message });
+  }
 });
 
 // Hapus Soal
 router.delete('/questions/:id', (req, res) => {
   const { id } = req.params;
-  const q = db.prepare('SELECT bank_id FROM questions WHERE id = ?').get(id);
+  const q = db.prepare('SELECT * FROM questions WHERE id = ?').get(id);
   if (q) {
     db.prepare('DELETE FROM questions WHERE id = ?').run(id);
     db.prepare('UPDATE question_banks SET total_questions = (SELECT COUNT(*) FROM questions WHERE bank_id = ?) WHERE id = ?').run(q.bank_id, q.bank_id);
+    removeLocalQuestionMedia(questionFilePaths(q));
   }
   return res.json({ success: true, message: 'Soal berhasil dihapus.' });
 });
@@ -413,11 +648,19 @@ router.get('/questions/template', (req, res) => {
     {
       No: 1,
       Pertanyaan: 'Ibukota negara Indonesia yang baru di Kalimantan Timur adalah...',
+      Gambar_Soal: '',
+      Audio_Soal: '',
+      Youtube_Soal: '',
       Opsi_A: 'Nusantara',
+      Gambar_A: '',
       Opsi_B: 'Balikpapan',
+      Gambar_B: '',
       Opsi_C: 'Samarinda',
+      Gambar_C: '',
       Opsi_D: 'Banjarmasin',
+      Gambar_D: '',
       Opsi_E: 'Pontianak',
+      Gambar_E: '',
       Kunci: 'A',
       Bobot: 10
     },
@@ -453,11 +696,14 @@ router.get('/questions/template', (req, res) => {
   ws['!cols'] = [
     { wch: 6 },  // No
     { wch: 50 }, // Pertanyaan
-    { wch: 20 }, // Opsi A
-    { wch: 20 }, // Opsi B
-    { wch: 20 }, // Opsi C
-    { wch: 20 }, // Opsi D
-    { wch: 20 }, // Opsi E
+    { wch: 32 }, // Gambar soal
+    { wch: 32 }, // Audio soal
+    { wch: 40 }, // YouTube soal
+    { wch: 20 }, { wch: 32 }, // Opsi dan gambar A
+    { wch: 20 }, { wch: 32 }, // Opsi dan gambar B
+    { wch: 20 }, { wch: 32 }, // Opsi dan gambar C
+    { wch: 20 }, { wch: 32 }, // Opsi dan gambar D
+    { wch: 20 }, { wch: 32 }, // Opsi dan gambar E
     { wch: 8 },  // Kunci
     { wch: 8 }   // Bobot
   ];
@@ -483,49 +729,75 @@ router.post('/banks/:bankId/import-excel', upload.single('excel_file'), (req, re
     const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
-    const rows = xlsx.utils.sheet_to_json(sheet);
+    const rows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
 
     if (!rows || rows.length === 0) {
       return res.status(400).json({ success: false, message: 'File Excel kosong atau tidak memiliki baris data.' });
     }
 
+    const normalizeHeader = key => String(key).trim().replace(/[\s_\-\/]/g, '').toLowerCase();
+    const normalizedRows = rows.map(row => {
+      const normalized = {};
+      for (const [key, value] of Object.entries(row)) normalized[normalizeHeader(key)] = value;
+      return normalized;
+    });
+    const cell = (row, ...aliases) => {
+      for (const alias of aliases) {
+        const value = row[normalizeHeader(alias)];
+        if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+      }
+      return '';
+    };
+
     const currentMax = db.prepare('SELECT MAX(question_number) as max_num FROM questions WHERE bank_id = ?').get(bankId);
     let nextNum = (currentMax?.max_num || 0) + 1;
-
+    const placeholders = QUESTION_COLUMNS.map(() => '?').join(', ');
     const insertQ = db.prepare(`
-      INSERT INTO questions (bank_id, question_number, question_text, option_a, option_b, option_c, option_d, option_e, correct_answer, weight)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO questions (bank_id, question_number, ${QUESTION_COLUMNS.join(', ')})
+      VALUES (?, ?, ${placeholders})
     `);
 
     let importedCount = 0;
-    const importTransaction = db.transaction((items) => {
-      for (const row of items) {
-        const questionText = row['Pertanyaan'] || row['Soal'] || row['question_text'];
-        const optA = row['Opsi_A'] || row['Pilihan_A'] || row['option_a'] || row['A'];
-        const optB = row['Opsi_B'] || row['Pilihan_B'] || row['option_b'] || row['B'];
-        const optC = row['Opsi_C'] || row['Pilihan_C'] || row['option_c'] || row['C'];
-        const optD = row['Opsi_D'] || row['Pilihan_D'] || row['option_d'] || row['D'];
-        const optE = row['Opsi_E'] || row['Pilihan_E'] || row['option_e'] || row['E'] || '';
-        let key = row['Kunci'] || row['Kunci_Jawaban'] || row['correct_answer'] || row['Jawaban'];
-        const weight = Number(row['Bobot'] || row['weight']) || 1.0;
+    let skippedCount = 0;
+    const errors = [];
+    const importTransaction = db.transaction(items => {
+      items.forEach((row, index) => {
+        try {
+          const source = {
+            question_text: cell(row, 'Pertanyaan', 'Soal', 'question_text'),
+            question_image: cell(row, 'Gambar_Soal', 'Foto_Soal', 'question_image'),
+            question_audio: cell(row, 'Audio_Soal', 'question_audio'),
+            youtube_url: cell(row, 'Youtube_Soal', 'Link_Youtube', 'youtube_url', 'YouTube'),
+            correct_answer: cell(row, 'Kunci', 'Kunci_Jawaban', 'correct_answer', 'Jawaban'),
+            weight: cell(row, 'Bobot', 'weight') || 1.0
+          };
+          for (const key of ['a', 'b', 'c', 'd', 'e']) {
+            const upper = key.toUpperCase();
+            source[`option_${key}`] = cell(row, `Opsi_${upper}`, `Pilihan_${upper}`, `option_${key}`, upper);
+            source[`option_${key}_image`] = cell(row, `Gambar_${upper}`, `Foto_${upper}`, `Gambar_Opsi_${upper}`, `option_${key}_image`);
+          }
 
-        if (questionText && optA && optB && optC && optD && key) {
-          key = String(key).trim().toUpperCase();
-          insertQ.run(bankId, nextNum++, String(questionText).trim(), String(optA).trim(), String(optB).trim(), String(optC).trim(), String(optD).trim(), optE ? String(optE).trim() : '', key, weight);
+          const { data } = buildQuestionData(source);
+          insertQ.run(bankId, nextNum++, ...questionValues(data));
           importedCount++;
+        } catch (err) {
+          skippedCount++;
+          errors.push(`Baris ${index + 2}: ${err.message}`);
         }
-      }
+      });
     });
 
-    importTransaction(rows);
+    importTransaction(normalizedRows);
 
     // Update total questions in bank
     db.prepare('UPDATE question_banks SET total_questions = (SELECT COUNT(*) FROM questions WHERE bank_id = ?) WHERE id = ?').run(bankId, bankId);
 
     return res.json({
       success: true,
-      message: `Berhasil mengimpor ${importedCount} butir soal dari Excel.`,
-      importedCount
+      message: `Berhasil mengimpor ${importedCount} butir soal dari Excel${skippedCount ? `; ${skippedCount} baris dilewati` : ''}.`,
+      importedCount,
+      skippedCount,
+      errors
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Gagal memproses file Excel: ' + err.message });

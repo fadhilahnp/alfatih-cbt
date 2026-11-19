@@ -214,11 +214,14 @@ router.get('/session/:sessionId', (req, res) => {
     const options = [];
 
     for (const key of optKeys) {
-      const optText = raw[`option_${key.toLowerCase()}`];
-      if (optText && optText.trim() !== '') {
+      const optionKey = key.toLowerCase();
+      const optText = raw[`option_${optionKey}`];
+      const optImage = raw[`option_${optionKey}_image`];
+      if ((optText && optText.trim() !== '') || optImage) {
         options.push({
           key,
-          text: optText
+          text: optText || '',
+          image: optImage || null
         });
       }
     }
@@ -230,6 +233,8 @@ router.get('/session/:sessionId', (req, res) => {
       number: index++,
       text: raw.question_text,
       image: raw.question_image,
+      audio: raw.question_audio,
+      youtubeUrl: raw.youtube_url,
       options,
       selectedAnswer: saved ? saved.selected_answer : null,
       isDoubtful: saved ? Boolean(saved.is_doubtful) : false

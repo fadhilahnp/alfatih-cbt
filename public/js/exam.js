@@ -17,6 +17,7 @@ let maxViolations = 5;
 let isExamFinished = false;
 let isLocked = false;
 let isConfirmingFinish = false; // Flag to prevent blur violation when confirming submit
+let renderedQuestionId = null;
 let snapshotIntervalMinutes = 30; // Default 30 menit as requested
 
 // Audio synthesizer for alerts
@@ -427,6 +428,65 @@ function showLockScreen() {
 // ========================================================
 // 4. QUESTION RENDERING & NAVIGATION (MOBILE OPTIMIZED)
 // ========================================================
+function getYouTubeEmbedUrl(value) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase().replace(/^www\./, '');
+    const parts = url.pathname.split('/').filter(Boolean);
+    let videoId = '';
+    if (host === 'youtu.be') {
+      videoId = parts[0] || '';
+    } else if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
+      if (url.pathname === '/watch') videoId = url.searchParams.get('v') || '';
+      if (['embed', 'shorts', 'live'].includes(parts[0])) videoId = parts[1] || '';
+    } else if (host === 'youtube-nocookie.com' || host.endsWith('.youtube-nocookie.com')) {
+      if (parts[0] === 'embed') videoId = parts[1] || '';
+    }
+    return /^[A-Za-z0-9_-]{11}$/.test(videoId)
+      ? `https://www.youtube-nocookie.com/embed/${videoId}`
+      : '';
+  } catch (err) {
+    return '';
+  }
+}
+
+function renderQuestionMedia(question) {
+  const container = document.getElementById('questionMedia');
+  container.querySelectorAll('audio').forEach(audio => audio.pause());
+  container.replaceChildren();
+
+  if (question.image) {
+    const image = document.createElement('img');
+    image.className = 'question-media-image';
+    image.src = question.image;
+    image.alt = 'Gambar pendukung soal';
+    image.draggable = false;
+    container.appendChild(image);
+  }
+
+  if (question.audio) {
+    const audio = document.createElement('audio');
+    audio.className = 'question-media-audio';
+    audio.controls = true;
+    audio.preload = 'metadata';
+    audio.src = question.audio;
+    container.appendChild(audio);
+  }
+
+  const embedUrl = getYouTubeEmbedUrl(question.youtubeUrl);
+  if (embedUrl) {
+    const iframe = document.createElement('iframe');
+    iframe.className = 'youtube-embed';
+    iframe.src = embedUrl;
+    iframe.title = 'Video YouTube pendukung soal';
+    iframe.loading = 'lazy';
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+    iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+    iframe.allowFullscreen = true;
+    container.appendChild(iframe);
+  }
+}
+
 function renderQuestion(index) {
   if (index < 0 || index >= questions.length) return;
   currentQuestionIndex = index;
@@ -434,13 +494,19 @@ function renderQuestion(index) {
   const q = questions[index];
   const ansData = studentAnswers[q.id] || { selected: null, isDoubtful: false };
 
-  // Set number badge
+  // Set number badge and render content only when moving to another question.
   document.getElementById('currentQuestionBadge').textContent = `Soal No. ${q.number}`;
-  document.getElementById('questionText').innerHTML = q.text;
+  if (renderedQuestionId !== q.id) {
+    const questionText = document.getElementById('questionText');
+    questionText.textContent = q.text || '';
+    questionText.style.display = q.text ? 'block' : 'none';
+    renderQuestionMedia(q);
+    renderedQuestionId = q.id;
+  }
 
   // Options list
   const container = document.getElementById('optionsContainer');
-  container.innerHTML = '';
+  container.replaceChildren();
 
   q.options.forEach(opt => {
     const isSelected = ansData.selected === opt.key;
@@ -448,10 +514,25 @@ function renderQuestion(index) {
     optDiv.className = `option-item ${isSelected ? 'selected' : ''}`;
     optDiv.onclick = () => selectOption(q.id, opt.key);
 
-    optDiv.innerHTML = `
-      <div class="option-key">${opt.key}</div>
-      <div class="option-text">${opt.text}</div>
-    `;
+    const keyElement = document.createElement('div');
+    keyElement.className = 'option-key';
+    keyElement.textContent = opt.key;
+    const textElement = document.createElement('div');
+    textElement.className = 'option-text';
+    if (opt.text) {
+      const textValue = document.createElement('div');
+      textValue.textContent = opt.text;
+      textElement.appendChild(textValue);
+    }
+    if (opt.image) {
+      const image = document.createElement('img');
+      image.className = 'option-image';
+      image.src = opt.image;
+      image.alt = `Gambar jawaban ${opt.key}`;
+      image.draggable = false;
+      textElement.appendChild(image);
+    }
+    optDiv.append(keyElement, textElement);
     container.appendChild(optDiv);
   });
 

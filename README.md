@@ -40,9 +40,13 @@ Aplikasi Computer-Based Test (CBT) berbasis web modern yang dibangun dengan **No
 * **Manajemen Bank Soal & Butir Soal**:
   - Pembuatan bank soal berdasarkan mata pelajaran dan tingkat kelas.
   - Kelola butir soal pilihan ganda (pertanyaan, opsi A, B, C, D, E, kunci jawaban, bobot nilai).
+  - Soal dapat dilengkapi gambar, audio, dan video YouTube; setiap opsi jawaban juga dapat memiliki gambar. Teks soal boleh dikosongkan jika menggunakan media, dan opsi A–D dapat diisi teks dan/atau gambar.
+  - Form tambah/edit menerima URL HTTP/HTTPS atau unggah file lokal. Gambar mendukung JPG, PNG, GIF, dan WebP (maksimal 5 MB per file); audio mendukung MP3, WAV, OGG, M4A, dan AAC (maksimal 10 MB). Jika keduanya diisi, file unggahan digunakan.
+  - Tautan `youtube.com`, `youtu.be`, Shorts, dan embed dinormalisasi lalu ditampilkan sebagai pemutar video pada halaman ujian. Pemutaran YouTube dan URL media eksternal memerlukan akses jaringan ke sumber tersebut.
 * **📥 Import Soal dari Excel (.xlsx)**:
   - Unduh template format Excel resmi dengan 1 klik (`/api/admin/questions/template`).
   - Import massal soal dari file Excel dengan validasi otomatis dan transaksi database cepat.
+  - Media melalui Excel diisi sebagai URL pada kolom `Gambar_Soal`, `Audio_Soal`, `Youtube_Soal`, serta `Gambar_A` sampai `Gambar_E`. File biner yang disematkan ke sel Excel tidak diproses; unggah file melalui form manual bila ingin menyimpannya di server.
 * **Atur Jadwal Ujian**:
   - Penentuan mata pelajaran, kelas peserta, rentang waktu mulai & selesai.
   - Durasi pengerjaan (menit) dan token ujian.
@@ -137,7 +141,8 @@ alfatih_cbt/
 │   │   ├── admin.js         # Utilitas dashboard admin & alert
 │   │   └── proctoring.js    # Pemantauan realtime WebSocket & galeri foto
 │   ├── uploads/
-│   │   └── proctoring/      # Direktori penyimpanan foto kamera terkompresi
+│   │   ├── proctoring/      # Direktori penyimpanan foto kamera terkompresi
+│   │   └── questions/       # Gambar/audio soal dan gambar opsi jawaban
 │   └── views/
 │       ├── login.html       # Halaman login terpadu Siswa & Admin
 │       ├── admin/

@@ -66,11 +66,18 @@ function initSchema() {
       question_number INTEGER DEFAULT 1,
       question_text TEXT NOT NULL,
       question_image TEXT,
+      question_audio TEXT,
+      youtube_url TEXT,
       option_a TEXT NOT NULL,
+      option_a_image TEXT,
       option_b TEXT NOT NULL,
+      option_b_image TEXT,
       option_c TEXT NOT NULL,
+      option_c_image TEXT,
       option_d TEXT NOT NULL,
+      option_d_image TEXT,
       option_e TEXT,
+      option_e_image TEXT,
       correct_answer TEXT NOT NULL,
       weight REAL DEFAULT 1.0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -160,6 +167,26 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_snapshots_session ON proctoring_snapshots(session_id);
     CREATE INDEX IF NOT EXISTS idx_snapshots_schedule ON proctoring_snapshots(schedule_id);
   `);
+
+  // CREATE TABLE IF NOT EXISTS does not add new columns to an existing database.
+  const existingQuestionColumns = new Set(
+    db.pragma('table_info(questions)').map(column => column.name)
+  );
+  const questionMediaColumns = [
+    'question_audio',
+    'youtube_url',
+    'option_a_image',
+    'option_b_image',
+    'option_c_image',
+    'option_d_image',
+    'option_e_image'
+  ];
+
+  for (const column of questionMediaColumns) {
+    if (!existingQuestionColumns.has(column)) {
+      db.exec(`ALTER TABLE questions ADD COLUMN ${column} TEXT`);
+    }
+  }
 }
 
 initSchema();

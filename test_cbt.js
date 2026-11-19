@@ -80,7 +80,7 @@ async function runTests() {
   console.log('\n6. Testing Start Exam Session...');
   const startExam = await postJson('/api/exam/start', {
     schedule_id: exam.id,
-    token: exam.token
+    token: exam.tokengit 
   }, studentCookie);
   console.log('Start exam status:', startExam.status, 'Session ID:', startExam.data.sessionId);
   const sessionId = startExam.data.sessionId;

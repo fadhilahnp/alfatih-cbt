@@ -19,7 +19,7 @@
 - Server: Express 5 di `server.js`; halaman berupa HTML statis dengan JavaScript inline dan/atau JavaScript global di `public/js/`.
 - Database: SQLite melalui `better-sqlite3` dengan API sinkron, WAL, foreign keys aktif, dan skema dibuat saat `db/database.js` pertama kali di-require.
 - Realtime: Socket.IO dipasang pada server HTTP dan, bila sertifikat tersedia, server HTTPS. Instance dibagikan ke route melalui `req.app.get('io')`.
-- Import/export Excel: `xlsx`; upload Excel ditampung di memori dengan `multer.memoryStorage()`. Foto webcam dikirim sebagai base64 JSON, bukan multipart.
+- Import/export Excel: `xlsx`; upload Excel dan file media soal ditampung di memori dengan `multer.memoryStorage()`. Media soal kemudian disimpan di `public/uploads/questions/`; foto webcam dikirim sebagai base64 JSON, bukan multipart.
 - Dependensi runtime lain: `cookie-parser`. Tidak ada library hashing password, ORM, migration runner, dotenv, linter, formatter, atau test framework.
 - Runtime saat dokumentasi dibuat: Node.js `v24.13.0`, npm `11.6.2`; README menyebut Node.js 18+.
 - HTTP mendengarkan di `0.0.0.0:3000`; HTTPS opsional di `0.0.0.0:3001`. Hanya `PORT` dan `HTTPS_PORT` yang dibaca dari environment.
@@ -70,6 +70,7 @@ alfatih_cbt/
 │   │   ├── exam.js              # Engine ujian siswa, timer, kamera, anti-cheat, socket
 │   │   └── proctoring.js        # Dashboard monitoring, galeri, remote action, socket admin
 │   ├── uploads/proctoring/      # Foto JPEG runtime; bukan aset sumber
+│   ├── uploads/questions/       # Gambar/audio soal dan gambar opsi; file runtime
 │   └── views/
 │       ├── login.html           # Tidak dipetakan server.js; bukan login aktif
 │       ├── admin/login.html
@@ -143,7 +144,7 @@ Sumber: `routes/exam.js`, prefix `/api/exam`, semuanya wajib sesi siswa.
 Detail yang menentukan perilaku:
 
 - `question_order` dan `options_order` dibuat hanya saat sesi baru. Resume memakai urutan tersimpan; jangan mengacak ulang saat membuka ujian kembali.
-- Opsi yang dikirim ke browser mempertahankan kunci asli `A`–`E`; yang diacak adalah urutan tampilannya. Jawaban dan kunci tetap dibandingkan berdasarkan kunci asli tersebut.
+- Opsi yang dikirim ke browser mempertahankan kunci asli `A`–`E`; yang diacak adalah urutan tampilannya. Jawaban dan kunci tetap dibandingkan berdasarkan kunci asli tersebut. Response juga membawa `image`, `audio`, `youtubeUrl` pada soal dan `image` pada setiap opsi yang memilikinya.
 - Sisa waktu dihitung server dari `started_at + duration_minutes - waktu sekarang`. Pengambilan session akan menyelesaikan dan menilai sesi aktif yang waktunya sudah habis.
 - Sesi baru berstatus `IN_PROGRESS`; sesi `FINISHED` tidak dapat dimulai lagi dan `LOCKED` memerlukan tindakan admin.
 - Penguncian terjadi ketika `violation_count >= max_violations`. Status sesi yang dikenal skema: `NOT_STARTED`, `IN_PROGRESS`, `FINISHED`, `LOCKED`, walaupun alur saat ini terutama memakai tiga status terakhir.
@@ -161,8 +162,8 @@ Sumber: `routes/admin.js`, prefix `/api/admin`, semuanya wajib sesi admin. UI ya
 | Excel siswa | `GET /students/template`, `POST /students/import-excel` dengan multipart field `excel_file` |
 | Kartu | `GET /students/cards?class_name=`; response juga berisi `schoolInfo` |
 | Bank soal | `GET /banks`, `POST /banks`, `DELETE /banks/:id` |
-| Butir soal | `GET|POST /banks/:bankId/questions`, `PUT|DELETE /questions/:id` |
-| Excel soal | `GET /questions/template`, `POST /banks/:bankId/import-excel` dengan multipart field `excel_file` |
+| Butir soal | `GET|POST /banks/:bankId/questions`, `PUT|DELETE /questions/:id`; tambah/edit menerima JSON lama atau multipart dengan field teks `question_image`, `question_audio`, `youtube_url`, `option_<a-e>_image` dan file `question_image_file`, `question_audio_file`, `option_<a-e>_image_file` |
+| Excel soal | `GET /questions/template`, `POST /banks/:bankId/import-excel` dengan multipart field `excel_file`; kolom URL media `Gambar_Soal`, `Audio_Soal`, `Youtube_Soal`, `Gambar_A`–`Gambar_E` |
 | Jadwal | `GET|POST /schedules`, `PUT|DELETE /schedules/:id`, `PATCH /schedules/:id/toggle` |
 | Monitoring | `GET /monitoring/:scheduleId` |
 | Aksi proktor | `POST /monitoring/unlock`, `/monitoring/force-finish`, `/monitoring/request-snapshot`, `/monitoring/send-warning` |
@@ -176,7 +177,7 @@ Catatan kontrak admin:
 - `target_classes` berupa `'ALL'` atau string kelas yang dipisahkan koma. Token jadwal dinormalisasi menjadi huruf besar.
 - Aksi `unlock`, `force-finish`, `request-snapshot`, dan `send-warning` memakai body JSON; field utamanya `sessionId`, `studentId` bila relevan, serta `message` untuk peringatan.
 - Query monitoring saat ini hanya mengambil sesi berstatus `IN_PROGRESS`, dengan 50 pelanggaran terbaru. Ini penting bila mengubah tampilan sesi terkunci/selesai.
-- Import siswa melewati NIS duplikat/baris tidak lengkap dan membuat password `alfa<NIS>` bila kosong. Import soal membaca sheet pertama, memetakan beberapa alias header, lalu memperbarui `question_banks.total_questions`.
+- Import siswa melewati NIS duplikat/baris tidak lengkap dan membuat password `alfa<NIS>` bila kosong. Import soal membaca sheet pertama, memetakan beberapa alias header, mendukung URL media pada kolom template, lalu memperbarui `question_banks.total_questions`. Form manual juga menerima unggahan lokal; teks soal dapat kosong jika ada media dan setiap opsi A–D wajib memiliki teks dan/atau gambar.
 - `calculateSessionScore(sessionId)` berada di file ini dan diekspor sebagai properti router; `routes/exam.js` mengimpornya. Nilai adalah `earnedWeight / totalWeight * 100`, dibulatkan satu desimal, sekaligus memperbarui jumlah benar/salah/kosong dan flag `is_correct`.
 - Penilaian membaca soal, kunci, dan bobot terkini dari bank saat perhitungan dilakukan; data tersebut tidak disalin sebagai snapshot nilai ke sesi.
 
@@ -189,7 +190,7 @@ Sumber kebenaran skema: `db/database.js`. File database selalu bernama `db/cbt_a
 | `users` | Admin: `username`, `password`, `name`, `role` |
 | `students` | Siswa: `nis` unik, `password`, `name`, `class_name`, `gender`, `session_name`, `room_name` |
 | `question_banks` | Bank: `code` unik, `subject`, `class_level`, `total_questions` |
-| `questions` | Soal milik `bank_id`; nomor, teks/gambar, opsi A–E, `correct_answer`, `weight`; cascade saat bank dihapus |
+| `questions` | Soal milik `bank_id`; nomor, teks, gambar/audio/YouTube, opsi A–E beserta gambar tiap opsi, `correct_answer`, `weight`; cascade saat bank dihapus |
 | `exam_schedules` | Jadwal milik `bank_id`; target kelas, waktu, durasi, token, pengacakan, hasil, batas pelanggaran, interval foto, aktif |
 | `student_exam_sessions` | Satu sesi per `UNIQUE(schedule_id, student_id)`; status, nilai/counter, urutan JSON, metadata klien |
 | `student_answers` | Satu jawaban per `UNIQUE(session_id, question_id)`; pilihan, ragu, benar/salah, waktu update |
@@ -213,7 +214,7 @@ question_banks 1───* questions│
 
 - `question_order` adalah JSON array ID soal; `options_order` adalah JSON object `{ [question_id]: ['A', ...] }`.
 - Indeks telah dibuat untuk pencarian penting. Foreign keys aktif, dan beberapa relasi sesi/jawaban/log memakai `ON DELETE CASCADE`.
-- `CREATE TABLE IF NOT EXISTS` **tidak memigrasikan kolom pada database lama**. Penambahan/perubahan kolom memerlukan strategi migrasi eksplisit dan pencadangan database beserta file WAL yang relevan.
+- `CREATE TABLE IF NOT EXISTS` **tidak memigrasikan kolom pada database lama**. Penambahan/perubahan kolom memerlukan strategi migrasi eksplisit dan pencadangan database beserta file WAL yang relevan. Khusus kolom media `questions`, `initSchema()` memeriksa `PRAGMA table_info(questions)` lalu menjalankan `ALTER TABLE ADD COLUMN` bila kolom belum ada.
 - `require('./db/database')` membuka database dan menjalankan inisialisasi sebagai side effect. Hindari require tanpa menyadari efek file tersebut.
 - Seeder bersifat tambah data demo, bukan reset. Pemeriksaan siswa/jadwal memakai jumlah global, sehingga jangan menganggap seeder akan melengkapi setiap baris yang hilang.
 
@@ -280,7 +281,7 @@ Jenis pelanggaran yang dipakai UI meliputi `TAB_SWITCH`, `WINDOW_BLUR`, `COPY_PA
 - **Finish/logout:** finish normal, force-finish, dan timeout server memanggil penilaian; logout siswa hanya mengubah status sesi aktif tanpa memanggil `calculateSessionScore`. Jangan menganggap semua jalur selesai setara.
 - **Unlock tidak mereset pelanggaran:** admin hanya mengubah status menjadi `IN_PROGRESS`; counter tetap ada sehingga pelanggaran berikutnya dapat langsung mengunci lagi.
 - **Monitoring:** query awal hanya memuat `IN_PROGRESS`; kode tampilan memang mengenal badge `LOCKED`, tetapi sesi terkunci tidak dikembalikan query tersebut.
-- **File foto:** metadata dan file JPEG adalah dua sumber data berbeda. Penghapusan record/database tidak otomatis membersihkan file lama. `/uploads` dilayani sebagai static public.
+- **File foto dan media:** metadata dan file adalah dua sumber data berbeda. Penghapusan record/database foto pengawasan tidak otomatis membersihkan file lama. Media lokal soal dihapus saat diganti atau saat soal/bank terkait dihapus. `/uploads` dilayani sebagai static public.
 - **Port HTTPS:** selain `HTTPS_PORT` di server, angka `3001` ditulis langsung pada `public/js/exam.js` dan `public/views/student/confirm.html`/`exam.html`. Perubahan port harus menyinkronkan semuanya.
 - **Dependensi native:** `better-sqlite3` harus cocok dengan versi/platform Node.js. Setelah upgrade Node.js atau instalasi pada mesin baru, jalankan instalasi dan tes pada environment target.
 - **Tidak ada auto-reload:** `npm run dev` sama dengan `npm start`; restart proses setelah mengubah backend.
