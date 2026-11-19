@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Siswa & Kartu Ujian - CBT AL-FATIH</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-icon">🎓</div>
+        <div>
+          <div style="font-weight: 800; font-size: 16px; color: white;">CBT AL-FATIH</div>
+          <div style="font-size: 11px; color: #94a3b8;">Sistem Ujian Terpadu</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/admin/dashboard" class="nav-item"><span class="icon">📊</span> Dashboard</a>
+        <a href="/admin/students" class="nav-item active"><span class="icon">👨‍🎓</span> Data Siswa & Kartu</a>
+        <a href="/admin/questions" class="nav-item"><span class="icon">📝</span> Bank Soal & Excel</a>
+        <a href="/admin/schedules" class="nav-item"><span class="icon">📅</span> Atur Jadwal Ujian</a>
+        <a href="/admin/monitoring" class="nav-item"><span class="icon">🛡️</span> Live Monitoring & Cam</a>
+        <a href="/admin/results" class="nav-item"><span class="icon">📈</span> Rekap Nilai Siswa</a>
+      </nav>
+      <div class="sidebar-footer">
+        <span style="font-size: 12px; color: #94a3b8;">Admin CBT</span>
+        <button onclick="handleLogout()" class="btn btn-secondary btn-sm" style="background:#1e293b; color:#ef4444; border-color:#334155;">Keluar</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <h2 style="font-size: 20px;">Manajemen Data Siswa</h2>
+          <p style="font-size: 13px; color: var(--text-muted);">Kelola data peserta ujian dan cetak kartu peserta lengkap dengan username & password</p>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <a href="/api/admin/students/template" class="btn btn-secondary">
+            📥 Download Template Excel
+          </a>
+          <button onclick="openImportStudentsModal()" class="btn btn-success">
+            📤 Import Siswa dari Excel
+          </button>
+          <a href="/admin/print-cards" target="_blank" class="btn btn-success">
+            🖨️ Cetak Kartu Ujian Siswa
+          </a>
+          <button onclick="openAddStudentModal()" class="btn btn-primary">
+            + Tambah Siswa Baru
+          </button>
+        </div>
+      </header>
+
+      <div class="page-content">
+        <div class="card">
+          <!-- Filters -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; flex-wrap: wrap;">
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <label style="font-size: 13px; font-weight: 600;">Filter Kelas:</label>
+              <select id="classFilter" class="form-select" style="width: 180px;" onchange="loadStudents()">
+                <option value="ALL">Semua Kelas</option>
+              </select>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <input type="text" id="searchInput" class="form-control" placeholder="Cari nama atau NIS..." style="width: 260px;" onkeyup="if(event.key==='Enter') loadStudents()">
+              <button class="btn btn-secondary" onclick="loadStudents()">Cari</button>
+            </div>
+          </div>
+
+          <!-- Students Table -->
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>NIS (Username)</th>
+                  <th>Nama Lengkap</th>
+                  <th>Kelas</th>
+                  <th>L/P</th>
+                  <th>Sesi Ujian</th>
+                  <th>Ruang</th>
+                  <th>Password Masuk</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="studentsTableBody">
+                <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">Memuat data siswa...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal Tambah / Edit Siswa -->
+  <div class="modal-backdrop" id="studentModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="modalStudentTitle" style="font-size: 18px; font-weight: 700;">Tambah Siswa Baru</h3>
+        <button onclick="closeStudentModal()" style="border: none; background: none; font-size: 20px; cursor: pointer;">&times;</button>
+      </div>
+      <form id="studentForm" onsubmit="saveStudent(event)">
+        <div class="modal-body">
+          <input type="hidden" id="studentId">
+          <div class="form-group">
+            <label class="form-label">Nomor Induk Siswa (NIS / Username Login) *</label>
+            <input type="text" id="formNis" class="form-control" required placeholder="Contoh: 2026011">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nama Lengkap Siswa *</label>
+            <input type="text" id="formName" class="form-control" required placeholder="Contoh: Muhammad Al-Fatih">
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Kelas / Rombel *</label>
+              <input type="text" id="formClass" class="form-control" required placeholder="Contoh: XII-MIPA-1">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Jenis Kelamin</label>
+              <select id="formGender" class="form-select">
+                <option value="L">Laki-Laki</option>
+                <option value="P">Perempuan</option>
+              </select>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Sesi Ujian</label>
+              <input type="text" id="formSession" class="form-control" value="Sesi 1 (07.30 - 09.30)">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Ruang Ujian</label>
+              <input type="text" id="formRoom" class="form-control" value="Lab Komputer 1">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password Ujian Siswa (Untuk dicetak di kartu) *</label>
+            <input type="text" id="formPassword" class="form-control" required placeholder="Contoh: alfa2026" style="font-family: monospace; font-weight: bold;">
+            <small style="color: var(--text-muted); font-size: 12px;">Password ini akan tertera pada kartu ujian dan digunakan siswa untuk login.</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeStudentModal()">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan Data Siswa</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Import Excel Data Siswa -->
+  <div class="modal-backdrop" id="importStudentModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 style="font-size: 18px; font-weight: 700;">Import Data Siswa dari File Excel (.xlsx)</h3>
+        <button onclick="closeImportStudentsModal()" style="border: none; background: none; font-size: 20px; cursor: pointer;">&times;</button>
+      </div>
+      <form onsubmit="handleImportStudentsExcel(event)">
+        <div class="modal-body">
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 14px; font-size: 13px; color: #1e40af; margin-bottom: 16px;">
+            <strong>Petunjuk Format Kolom:</strong>
+            <ul style="margin: 8px 0 8px 18px; padding: 0; line-height: 1.7;">
+              <li><strong>NIS</strong> (wajib) — NIS juga menjadi username login siswa</li>
+              <li><strong>Nama</strong> (wajib)</li>
+              <li><strong>Kelas</strong> (wajib) — Contoh: XII-MIPA-1</li>
+              <li><strong>JK</strong> (opsional) — L atau P, default: L</li>
+              <li><strong>Sesi_Ujian</strong> (opsional) — default: Sesi 1</li>
+              <li><strong>Ruang</strong> (opsional) — default: Ruang 01</li>
+              <li><strong>Password</strong> (opsional) — jika kosong, dibuat otomatis (alfa + NIS)</li>
+            </ul>
+            <a href="/api/admin/students/template" style="display: inline-block; margin-top: 6px; font-weight: 700; color: #2563eb;">
+              📥 Klik di sini untuk mengunduh template Excel
+            </a>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Pilih File Excel (.xlsx / .xls) *</label>
+            <input type="file" id="studentExcelFileInput" class="form-control" accept=".xlsx, .xls" required>
+          </div>
+          <div id="importStudentsResult" style="display: none; margin-top: 14px;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeImportStudentsModal()">Batal</button>
+          <button type="submit" class="btn btn-success" id="importStudentsSubmitBtn">Mulai Import Siswa</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/admin.js"></script>
+  <script>
+    let studentsData = [];
+
+    async function loadClasses() {
+      try {
+        const res = await fetch('/api/admin/classes');
+        const json = await res.json();
+        const sel = document.getElementById('classFilter');
+        sel.innerHTML = '<option value="ALL">Semua Kelas</option>';
+        json.data.forEach(c => {
+          sel.innerHTML += `<option value="${c}">${c}</option>`;
+        });
+      } catch (e) {}
+    }
+
+    async function loadStudents() {
+      const cls = document.getElementById('classFilter').value;
+      const search = document.getElementById('searchInput').value;
+      const tbody = document.getElementById('studentsTableBody');
+
+      try {
+        let url = `/api/admin/students?class_name=${cls}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+
+        const res = await fetch(url);
+        const json = await res.json();
+        studentsData = json.data;
+
+        tbody.innerHTML = '';
+        if (studentsData.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 24px;">Tidak ada data siswa ditemukan.</td></tr>';
+          return;
+        }
+
+        studentsData.forEach((s, idx) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${idx + 1}</td>
+            <td><strong>${s.nis}</strong></td>
+            <td>${s.name}</td>
+            <td><span class="badge badge-info">${s.class_name}</span></td>
+            <td>${s.gender}</td>
+            <td>${s.session_name}</td>
+            <td>${s.room_name}</td>
+            <td><span style="font-family: monospace; font-weight: 700; color: #1e40af; background: #eff6ff; padding: 2px 8px; border-radius: 4px;">${s.password}</span></td>
+            <td>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn-secondary btn-sm" onclick="openEditStudent(${s.id})">Edit</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.id}, '${s.name}')">Hapus</button>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+      } catch (err) {
+        showToast('Gagal memuat data siswa', 'danger');
+      }
+    }
+
+    function openAddStudentModal() {
+      document.getElementById('modalStudentTitle').textContent = 'Tambah Siswa Baru';
+      document.getElementById('studentId').value = '';
+      document.getElementById('studentForm').reset();
+      document.getElementById('formSession').value = 'Sesi 1 (07.30 - 09.30)';
+      document.getElementById('formRoom').value = 'Lab Komputer 1';
+      document.getElementById('studentModal').classList.add('active');
+    }
+
+    function openEditStudent(id) {
+      const s = studentsData.find(x => x.id === id);
+      if (!s) return;
+
+      document.getElementById('modalStudentTitle').textContent = 'Edit Data Siswa';
+      document.getElementById('studentId').value = s.id;
+      document.getElementById('formNis').value = s.nis;
+      document.getElementById('formName').value = s.name;
+      document.getElementById('formClass').value = s.class_name;
+      document.getElementById('formGender').value = s.gender;
+      document.getElementById('formSession').value = s.session_name;
+      document.getElementById('formRoom').value = s.room_name;
+      document.getElementById('formPassword').value = s.password;
+
+      document.getElementById('studentModal').classList.add('active');
+    }
+
+    function closeStudentModal() {
+      document.getElementById('studentModal').classList.remove('active');
+    }
+
+    async function saveStudent(e) {
+      e.preventDefault();
+      const id = document.getElementById('studentId').value;
+      const payload = {
+        nis: document.getElementById('formNis').value,
+        name: document.getElementById('formName').value,
+        class_name: document.getElementById('formClass').value,
+        gender: document.getElementById('formGender').value,
+        session_name: document.getElementById('formSession').value,
+        room_name: document.getElementById('formRoom').value,
+        password: document.getElementById('formPassword').value
+      };
+
+      try {
+        let url = '/api/admin/students';
+        let method = 'POST';
+
+        if (id) {
+          url += `/${id}`;
+          method = 'PUT';
+        }
+
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message, 'success');
+          closeStudentModal();
+          loadStudents();
+          loadClasses();
+        } else {
+          showToast(data.message, 'danger');
+        }
+      } catch (err) {
+        showToast('Terjadi kesalahan menyimpan data siswa', 'danger');
+      }
+    }
+
+    async function deleteStudent(id, name) {
+      if (confirm(`Hapus data siswa "${name}"?`)) {
+        try {
+          const res = await fetch(`/api/admin/students/${id}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (data.success) {
+            showToast(data.message, 'success');
+            loadStudents();
+          } else {
+            showToast(data.message, 'danger');
+          }
+        } catch (e) {
+          showToast('Gagal menghapus siswa', 'danger');
+        }
+      }
+    }
+
+    // Modal Import Excel Data Siswa
+    function openImportStudentsModal() {
+      document.getElementById('studentExcelFileInput').value = '';
+      const box = document.getElementById('importStudentsResult');
+      box.style.display = 'none';
+      box.innerHTML = '';
+      document.getElementById('importStudentModal').classList.add('active');
+    }
+    function closeImportStudentsModal() {
+      document.getElementById('importStudentModal').classList.remove('active');
+    }
+
+    async function handleImportStudentsExcel(e) {
+      e.preventDefault();
+      const fileInput = document.getElementById('studentExcelFileInput');
+      if (!fileInput.files || fileInput.files.length === 0) {
+        showToast('Pilih file Excel terlebih dahulu', 'warning');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('excel_file', fileInput.files[0]);
+
+      const submitBtn = document.getElementById('importStudentsSubmitBtn');
+      submitBtn.textContent = 'Mengimpor...';
+      submitBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/admin/students/import-excel', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        const box = document.getElementById('importStudentsResult');
+        box.style.display = 'block';
+
+        if (data.success) {
+          let html = `<div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; font-size: 13px; color: #15803d; font-weight: 600;">✅ ${data.message}</div>`;
+          if (data.errors && data.errors.length > 0) {
+            html += `<div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; margin-top: 10px; font-size: 12px; color: #92400e;"><strong>⚠️ Detail baris yang dilewati:</strong><ul style="margin: 8px 0 0 18px; padding: 0; line-height: 1.6;">${data.errors.map(x => `<li>${x}</li>`).join('')}</ul></div>`;
+          }
+          box.innerHTML = html;
+          showToast(data.message, 'success');
+          loadStudents();
+          loadClasses();
+        } else {
+          box.innerHTML = `<div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; font-size: 13px; color: #b91c1c; font-weight: 600;">❌ ${data.message}</div>`;
+          showToast(data.message, 'danger');
+        }
+      } catch (err) {
+        showToast('Gagal mengimpor file: ' + err.message, 'danger');
+      } finally {
+        submitBtn.textContent = 'Mulai Import Siswa';
+        submitBtn.disabled = false;
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadClasses();
+      loadStudents();
+    });
+  </script>
+</body>
+</html>

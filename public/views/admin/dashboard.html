@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Admin - CBT AL-FATIH</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-icon">🎓</div>
+        <div>
+          <div style="font-weight: 800; font-size: 16px; color: white;">CBT AL-FATIH</div>
+          <div style="font-size: 11px; color: #94a3b8;">Sistem Ujian Terpadu</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/admin/dashboard" class="nav-item active"><span class="icon">📊</span> Dashboard</a>
+        <a href="/admin/students" class="nav-item"><span class="icon">👨‍🎓</span> Data Siswa & Kartu</a>
+        <a href="/admin/questions" class="nav-item"><span class="icon">📝</span> Bank Soal & Excel</a>
+        <a href="/admin/schedules" class="nav-item"><span class="icon">📅</span> Atur Jadwal Ujian</a>
+        <a href="/admin/monitoring" class="nav-item"><span class="icon">🛡️</span> Live Monitoring & Cam</a>
+        <a href="/admin/results" class="nav-item"><span class="icon">📈</span> Rekap Nilai Siswa</a>
+      </nav>
+      <div class="sidebar-footer">
+        <span style="font-size: 12px; color: #94a3b8;">Admin CBT</span>
+        <button onclick="handleLogout()" class="btn btn-secondary btn-sm" style="background:#1e293b; color:#ef4444; border-color:#334155;">Keluar</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <h2 style="font-size: 20px;">Ringkasan Sistem CBT</h2>
+          <p style="font-size: 13px; color: var(--text-muted);">Pantau status ujian, kecurangan, dan data siswa secara realtime</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <a href="/admin/monitoring" class="btn btn-primary btn-sm">🔴 Buka Live Proctoring</a>
+          <span style="font-size: 13px; font-weight: 600;" id="adminNameDisplay">Administrator</span>
+        </div>
+      </header>
+
+      <div class="page-content">
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon blue">👨‍🎓</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statStudents">0</div>
+              <div class="stat-label">Total Peserta Siswa</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green">📝</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statQuestions">0</div>
+              <div class="stat-label">Butir Soal Tersedia</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon amber">📅</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statSchedules">0</div>
+              <div class="stat-label">Jadwal Ujian Aktif</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon red">🚨</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statViolations">0</div>
+              <div class="stat-label">Pelanggaran Terdeteksi</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon purple">📷</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statSnapshots">0</div>
+              <div class="stat-label">Foto Kamera Pengawasan</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 2fr 1.2fr; gap: 24px;">
+          <!-- Active Exams Card -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Jadwal Ujian Berlangsung</h3>
+              <a href="/admin/schedules" class="btn btn-secondary btn-sm">Kelola Jadwal →</a>
+            </div>
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Judul Ujian</th>
+                    <th>Mata Pelajaran</th>
+                    <th>Token</th>
+                    <th>Durasi</th>
+                    <th>Peserta Aktif</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="activeExamsTable">
+                  <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Memuat jadwal...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Recent Violations Card -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title" style="color: #dc2626;">🚨 Log Kecurangan Terkini</h3>
+              <a href="/admin/monitoring" class="btn btn-danger btn-sm">Pantau Live</a>
+            </div>
+            <div id="recentViolationsList" style="display: flex; flex-direction: column; gap: 10px;">
+              <p style="text-align: center; color: var(--text-muted); padding: 20px;">Memuat riwayat...</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/admin.js"></script>
+  <script>
+    async function loadDashboard() {
+      try {
+        const res = await fetch('/api/admin/dashboard/stats');
+        const json = await res.json();
+        if (!json.success) return;
+
+        const d = json.data;
+        document.getElementById('statStudents').textContent = d.totalStudents;
+        document.getElementById('statQuestions').textContent = d.totalQuestions;
+        document.getElementById('statSchedules').textContent = d.activeSchedules;
+        document.getElementById('statViolations').textContent = d.totalViolations;
+        document.getElementById('statSnapshots').textContent = d.totalSnapshots;
+
+        // Active exams
+        const examsTbody = document.getElementById('activeExamsTable');
+        examsTbody.innerHTML = '';
+        if (d.activeExams.length === 0) {
+          examsTbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Tidak ada jadwal ujian yang aktif saat ini.</td></tr>';
+        } else {
+          d.activeExams.forEach(e => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td><strong>${e.title}</strong></td>
+              <td>${e.subject}</td>
+              <td><span class="badge badge-info">${e.token || 'Tanpa Token'}</span></td>
+              <td>${e.duration_minutes} Menit</td>
+              <td><span class="badge badge-success">${e.active_students_count} Mengerjakan</span></td>
+              <td>
+                <a href="/admin/monitoring?schedule_id=${e.id}" class="btn btn-primary btn-sm">Monitor</a>
+              </td>
+            `;
+            examsTbody.appendChild(tr);
+          });
+        }
+
+        // Recent violations
+        const violContainer = document.getElementById('recentViolationsList');
+        violContainer.innerHTML = '';
+        if (d.recentViolations.length === 0) {
+          violContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 20px;">Belum ada pelanggaran tercatat. Ujian tertib!</p>';
+        } else {
+          d.recentViolations.forEach(v => {
+            const div = document.createElement('div');
+            div.style.cssText = 'background: #fef2f2; border: 1px solid #fee2e2; border-radius: 8px; padding: 10px 14px; font-size: 13px;';
+            const timeStr = new Date(v.timestamp).toLocaleTimeString('id-ID');
+            div.innerHTML = `
+              <div style="display: flex; justify-content: space-between; font-weight: 700; color: #991b1b;">
+                <span>${v.student_name} (${v.class_name})</span>
+                <span style="font-size: 11px;">${timeStr}</span>
+              </div>
+              <div style="font-size: 12px; color: #b91c1c; margin-top: 2px;">
+                <strong>[${v.violation_type}]</strong> ${v.description}
+              </div>
+            `;
+            violContainer.appendChild(div);
+          });
+        }
+
+      } catch (err) {
+        console.error('Error load dashboard:', err);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', loadDashboard);
+  </script>
+</body>
+</html>

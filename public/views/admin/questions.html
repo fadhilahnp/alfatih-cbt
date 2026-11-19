@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manajemen Soal & Import Excel - CBT AL-FATIH</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-icon">🎓</div>
+        <div>
+          <div style="font-weight: 800; font-size: 16px; color: white;">CBT AL-FATIH</div>
+          <div style="font-size: 11px; color: #94a3b8;">Sistem Ujian Terpadu</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/admin/dashboard" class="nav-item"><span class="icon">📊</span> Dashboard</a>
+        <a href="/admin/students" class="nav-item"><span class="icon">👨‍🎓</span> Data Siswa & Kartu</a>
+        <a href="/admin/questions" class="nav-item active"><span class="icon">📝</span> Bank Soal & Excel</a>
+        <a href="/admin/schedules" class="nav-item"><span class="icon">📅</span> Atur Jadwal Ujian</a>
+        <a href="/admin/monitoring" class="nav-item"><span class="icon">🛡️</span> Live Monitoring & Cam</a>
+        <a href="/admin/results" class="nav-item"><span class="icon">📈</span> Rekap Nilai Siswa</a>
+      </nav>
+      <div class="sidebar-footer">
+        <span style="font-size: 12px; color: #94a3b8;">Admin CBT</span>
+        <button onclick="handleLogout()" class="btn btn-secondary btn-sm" style="background:#1e293b; color:#ef4444; border-color:#334155;">Keluar</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <h2 style="font-size: 20px;" id="pageTitle">Bank Soal Ujian</h2>
+          <p style="font-size: 13px; color: var(--text-muted);" id="pageSubtitle">Kelola daftar bank soal, butir soal, dan impor soal menggunakan format Excel</p>
+        </div>
+        <div id="headerActions">
+          <button onclick="openCreateBankModal()" class="btn btn-primary">
+            + Tambah Bank Soal
+          </button>
+        </div>
+      </header>
+
+      <div class="page-content">
+        <!-- VIEW 1: BANK LIST -->
+        <div id="bankListView">
+          <div class="card">
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Kode Bank</th>
+                    <th>Mata Pelajaran</th>
+                    <th>Tingkat</th>
+                    <th>Deskripsi</th>
+                    <th>Jumlah Soal</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="bankTableBody">
+                  <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Memuat bank soal...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW 2: QUESTIONS LIST IN SELECTED BANK -->
+        <div id="questionsListView" style="display: none;">
+          <div class="card" style="margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <button class="btn btn-secondary btn-sm" onclick="backToBankList()">← Kembali ke Daftar Bank Soal</button>
+                <h3 id="currentBankTitle" style="font-size: 18px; margin-top: 10px;">Bank Soal</h3>
+              </div>
+              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <a href="/api/admin/questions/template" class="btn btn-secondary">
+                  📥 Download Template Excel
+                </a>
+                <button onclick="openImportExcelModal()" class="btn btn-success">
+                  📤 Import Soal dari Excel
+                </button>
+                <button onclick="openAddQuestionModal()" class="btn btn-primary">
+                  + Tambah Butir Soal
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 50px;">No</th>
+                    <th>Pertanyaan & Pilihan Jawaban</th>
+                    <th style="width: 80px;">Kunci</th>
+                    <th style="width: 70px;">Bobot</th>
+                    <th style="width: 140px;">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="questionsTableBody">
+                  <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Memuat butir soal...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal Buat Bank Soal -->
+  <div class="modal-backdrop" id="bankModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 style="font-size: 18px; font-weight: 700;">Buat Bank Soal Baru</h3>
+        <button onclick="closeBankModal()" style="border: none; background: none; font-size: 20px; cursor: pointer;">&times;</button>
+      </div>
+      <form onsubmit="saveBank(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Kode Bank Soal (Unik) *</label>
+            <input type="text" id="bankCode" class="form-control" placeholder="Contoh: BIO-XII-2026" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mata Pelajaran *</label>
+            <input type="text" id="bankSubject" class="form-control" placeholder="Contoh: Biologi Peminatan" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tingkat Kelas *</label>
+            <input type="text" id="bankLevel" class="form-control" placeholder="Contoh: XII" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Deskripsi / Keterangan</label>
+            <textarea id="bankDesc" class="form-control" rows="2" placeholder="Catatan opsional..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeBankModal()">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan Bank Soal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Import Excel -->
+  <div class="modal-backdrop" id="importModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 style="font-size: 18px; font-weight: 700;">Import Soal dari File Excel (.xlsx)</h3>
+        <button onclick="closeImportModal()" style="border: none; background: none; font-size: 20px; cursor: pointer;">&times;</button>
+      </div>
+      <form onsubmit="handleImportExcel(event)">
+        <div class="modal-body">
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 14px; font-size: 13px; color: #1e40af; margin-bottom: 16px;">
+            <strong>Petunjuk Format Excel:</strong>
+            <p style="margin-top: 4px;">Gunakan template resmi agar format kolom (Pertanyaan, Opsi_A - E, Kunci, Bobot) sesuai dengan sistem.</p>
+            <a href="/api/admin/questions/template" style="display: inline-block; margin-top: 6px; font-weight: 700; color: #2563eb;">
+              📥 Klik di sini untuk mengunduh template Excel
+            </a>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Pilih File Excel (.xlsx / .xls) *</label>
+            <input type="file" id="excelFileInput" class="form-control" accept=".xlsx, .xls" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeImportModal()">Batal</button>
+          <button type="submit" class="btn btn-success" id="importSubmitBtn">Mulai Import Soal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Tambah / Edit Butir Soal Manual -->
+  <div class="modal-backdrop" id="questionModal">
+    <div class="modal-dialog" style="max-width: 700px;">
+      <div class="modal-header">
+        <h3 id="questionModalTitle" style="font-size: 18px; font-weight: 700;">Tambah Butir Soal</h3>
+        <button onclick="closeQuestionModal()" style="border: none; background: none; font-size: 20px; cursor: pointer;">&times;</button>
+      </div>
+      <form id="questionForm" onsubmit="saveQuestion(event)">
+        <div class="modal-body">
+          <input type="hidden" id="editQuestionId">
+          <div class="form-group">
+            <label class="form-label">Teks Pertanyaan Soal *</label>
+            <textarea id="qText" class="form-control" rows="3" required placeholder="Tuliskan pertanyaan di sini..."></textarea>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label">Pilihan A *</label>
+              <input type="text" id="qOptA" class="form-control" required placeholder="Jawaban A">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Pilihan B *</label>
+              <input type="text" id="qOptB" class="form-control" required placeholder="Jawaban B">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Pilihan C *</label>
+              <input type="text" id="qOptC" class="form-control" required placeholder="Jawaban C">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Pilihan D *</label>
+              <input type="text" id="qOptD" class="form-control" required placeholder="Jawaban D">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Pilihan E (Opsional)</label>
+            <input type="text" id="qOptE" class="form-control" placeholder="Jawaban E (opsional)">
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label">Kunci Jawaban Benar *</label>
+              <select id="qCorrect" class="form-select" required>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+                <option value="E">E</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Bobot Nilai *</label>
+              <input type="number" id="qWeight" class="form-control" value="10" required min="1">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeQuestionModal()">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan Soal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/admin.js"></script>
+  <script>
+    let activeBankId = null;
+    let questionsData = [];
+
+    async function loadBanks() {
+      try {
+        const res = await fetch('/api/admin/banks');
+        const json = await res.json();
+        const tbody = document.getElementById('bankTableBody');
+        tbody.innerHTML = '';
+
+        if (json.data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">Belum ada bank soal.</td></tr>';
+          return;
+        }
+
+        json.data.forEach(b => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><strong>${b.code}</strong></td>
+            <td>${b.subject}</td>
+            <td><span class="badge badge-info">Kelas ${b.class_level}</span></td>
+            <td>${b.description || '-'}</td>
+            <td><span class="badge badge-success">${b.real_question_count} Soal</span></td>
+            <td>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn-primary btn-sm" onclick="openBankQuestions(${b.id}, '${b.subject} (${b.code})')">
+                  Kelola Butir Soal (${b.real_question_count}) →
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="deleteBank(${b.id}, '${b.subject}')">Hapus</button>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        showToast('Gagal memuat bank soal', 'danger');
+      }
+    }
+
+    async function openBankQuestions(bankId, bankTitle) {
+      activeBankId = bankId;
+      document.getElementById('bankListView').style.display = 'none';
+      document.getElementById('questionsListView').style.display = 'block';
+      document.getElementById('currentBankTitle').textContent = `Daftar Soal: ${bankTitle}`;
+      await loadQuestions(bankId);
+    }
+
+    function backToBankList() {
+      activeBankId = null;
+      document.getElementById('bankListView').style.display = 'block';
+      document.getElementById('questionsListView').style.display = 'none';
+      loadBanks();
+    }
+
+    async function loadQuestions(bankId) {
+      const tbody = document.getElementById('questionsTableBody');
+      try {
+        const res = await fetch(`/api/admin/banks/${bankId}/questions`);
+        const json = await res.json();
+        questionsData = json.data;
+        tbody.innerHTML = '';
+
+        if (questionsData.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">Bank soal ini belum memiliki butir soal. Silakan tambah manual atau import dari Excel.</td></tr>';
+          return;
+        }
+
+        questionsData.forEach((q, idx) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td style="font-weight: 700; text-align: center;">${idx + 1}</td>
+            <td>
+              <div style="font-weight: 600; margin-bottom: 6px; font-size: 14px;">${q.question_text}</div>
+              <div style="font-size: 12px; color: var(--text-muted); display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+                <div><strong>A:</strong> ${q.option_a}</div>
+                <div><strong>B:</strong> ${q.option_b}</div>
+                <div><strong>C:</strong> ${q.option_c}</div>
+                <div><strong>D:</strong> ${q.option_d}</div>
+                ${q.option_e ? `<div><strong>E:</strong> ${q.option_e}</div>` : ''}
+              </div>
+            </td>
+            <td><span class="badge badge-success" style="font-size: 14px; font-weight: 800;">${q.correct_answer}</span></td>
+            <td><strong>${q.weight}</strong></td>
+            <td>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn-secondary btn-sm" onclick="editQuestion(${q.id})">Edit</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteQuestion(${q.id})">Hapus</button>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        showToast('Gagal memuat pertanyaan', 'danger');
+      }
+    }
+
+    // Modal Bank
+    function openCreateBankModal() {
+      document.getElementById('bankModal').classList.add('active');
+    }
+    function closeBankModal() {
+      document.getElementById('bankModal').classList.remove('active');
+    }
+
+    async function saveBank(e) {
+      e.preventDefault();
+      const payload = {
+        code: document.getElementById('bankCode').value,
+        subject: document.getElementById('bankSubject').value,
+        class_level: document.getElementById('bankLevel').value,
+        description: document.getElementById('bankDesc').value
+      };
+
+      try {
+        const res = await fetch('/api/admin/banks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message, 'success');
+          closeBankModal();
+          loadBanks();
+        } else {
+          showToast(data.message, 'danger');
+        }
+      } catch (e) {
+        showToast('Gagal menyimpan bank soal', 'danger');
+      }
+    }
+
+    async function deleteBank(id, name) {
+      if (confirm(`Hapus bank soal "${name}" beserta seluruh butir soal di dalamnya?`)) {
+        try {
+          const res = await fetch(`/api/admin/banks/${id}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (data.success) {
+            showToast(data.message, 'success');
+            loadBanks();
+          }
+        } catch (e) {
+          showToast('Gagal menghapus bank', 'danger');
+        }
+      }
+    }
+
+    // Modal Import Excel
+    function openImportExcelModal() {
+      document.getElementById('excelFileInput').value = '';
+      document.getElementById('importModal').classList.add('active');
+    }
+    function closeImportModal() {
+      document.getElementById('importModal').classList.remove('active');
+    }
+
+    async function handleImportExcel(e) {
+      e.preventDefault();
+      const fileInput = document.getElementById('excelFileInput');
+      if (!fileInput.files || fileInput.files.length === 0) {
+        showToast('Pilih file Excel terlebih dahulu', 'warning');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('excel_file', fileInput.files[0]);
+
+      const submitBtn = document.getElementById('importSubmitBtn');
+      submitBtn.textContent = 'Mengimpor...';
+      submitBtn.disabled = true;
+
+      try {
+        const res = await fetch(`/api/admin/banks/${activeBankId}/import-excel`, {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message, 'success');
+          closeImportModal();
+          loadQuestions(activeBankId);
+        } else {
+          showToast(data.message, 'danger');
+        }
+      } catch (err) {
+        showToast('Gagal mengimpor file: ' + err.message, 'danger');
+      } finally {
+        submitBtn.textContent = 'Mulai Import Soal';
+        submitBtn.disabled = false;
+      }
+    }
+
+    // Modal Question Manual
+    function openAddQuestionModal() {
+      document.getElementById('questionModalTitle').textContent = 'Tambah Butir Soal';
+      document.getElementById('editQuestionId').value = '';
+      document.getElementById('questionForm').reset();
+      document.getElementById('qWeight').value = '10';
+      document.getElementById('questionModal').classList.add('active');
+    }
+    function closeQuestionModal() {
+      document.getElementById('questionModal').classList.remove('active');
+    }
+
+    function editQuestion(id) {
+      const q = questionsData.find(x => x.id === id);
+      if (!q) return;
+
+      document.getElementById('questionModalTitle').textContent = 'Edit Butir Soal';
+      document.getElementById('editQuestionId').value = q.id;
+      document.getElementById('qText').value = q.question_text;
+      document.getElementById('qOptA').value = q.option_a;
+      document.getElementById('qOptB').value = q.option_b;
+      document.getElementById('qOptC').value = q.option_c;
+      document.getElementById('qOptD').value = q.option_d;
+      document.getElementById('qOptE').value = q.option_e || '';
+      document.getElementById('qCorrect').value = q.correct_answer;
+      document.getElementById('qWeight').value = q.weight;
+
+      document.getElementById('questionModal').classList.add('active');
+    }
+
+    async function saveQuestion(e) {
+      e.preventDefault();
+      const id = document.getElementById('editQuestionId').value;
+      const payload = {
+        question_text: document.getElementById('qText').value,
+        option_a: document.getElementById('qOptA').value,
+        option_b: document.getElementById('qOptB').value,
+        option_c: document.getElementById('qOptC').value,
+        option_d: document.getElementById('qOptD').value,
+        option_e: document.getElementById('qOptE').value,
+        correct_answer: document.getElementById('qCorrect').value,
+        weight: Number(document.getElementById('qWeight').value) || 10
+      };
+
+      try {
+        let url = `/api/admin/banks/${activeBankId}/questions`;
+        let method = 'POST';
+
+        if (id) {
+          url = `/api/admin/questions/${id}`;
+          method = 'PUT';
+        }
+
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message, 'success');
+          closeQuestionModal();
+          loadQuestions(activeBankId);
+        } else {
+          showToast(data.message, 'danger');
+        }
+      } catch (err) {
+        showToast('Gagal menyimpan soal', 'danger');
+      }
+    }
+
+    async function deleteQuestion(id) {
+      if (confirm('Hapus butir soal ini?')) {
+        try {
+          const res = await fetch(`/api/admin/questions/${id}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (data.success) {
+            showToast(data.message, 'success');
+            loadQuestions(activeBankId);
+          }
+        } catch (e) {
+          showToast('Gagal menghapus soal', 'danger');
+        }
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', loadBanks);
+  </script>
+</body>
+</html>

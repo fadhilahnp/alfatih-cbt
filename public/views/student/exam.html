@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ujian CBT - CBT AL-FATIH</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/exam.css">
+</head>
+<body class="exam-mode">
+
+  <!-- Exam Header -->
+  <header class="exam-header">
+    <div class="exam-brand">
+      <div class="brand-logo">AF</div>
+      <div>
+        <div class="exam-title-text" id="examTitle">Memuat Ujian...</div>
+        <div class="exam-subject-text" id="examSubject">Mata Pelajaran</div>
+      </div>
+    </div>
+
+    <!-- Center: Countdown Timer -->
+    <div class="exam-header-center">
+      <div class="exam-timer-box" id="examTimerBox">
+        <span>⏱️</span>
+        <span id="timerText">--:--:--</span>
+      </div>
+    </div>
+
+    <!-- Right: Student Profile & Webcam Widget & Palette Button on Mobile -->
+    <div class="exam-header-right">
+      <div class="student-badge-info">
+        <div class="student-badge-name" id="studentName">Nama Peserta</div>
+        <div class="student-badge-class" id="studentClass">Kelas • Ruang</div>
+      </div>
+
+      <!-- Live Front Webcam Preview Box -->
+      <div class="cam-preview-box" id="camPreviewBox" title="Kamera Pengawasan Aktif">
+        <video id="cameraPreview" autoplay playsinline webkit-playsinline muted></video>
+        <div class="cam-live-indicator" id="camLiveIndicator"></div>
+      </div>
+
+      <!-- Mobile Button: Toggle Daftar Soal Drawer -->
+      <button class="btn-toggle-palette" id="togglePaletteBtn" onclick="togglePaletteDrawer()">
+        📋 Soal
+      </button>
+    </div>
+  </header>
+
+  <!-- Mobile Palette Backdrop -->
+  <div class="palette-backdrop" id="paletteBackdrop" onclick="closePaletteDrawer()"></div>
+
+  <!-- Exam Container (Question Pane + Palette Pane) -->
+  <div class="exam-container">
+    <!-- Left Question Pane -->
+    <main class="question-pane">
+      <div class="question-card font-scale-md" id="questionCard">
+        <!-- Card Header -->
+        <div class="question-card-header">
+          <div class="question-number-badge" id="currentQuestionBadge">
+            Soal No. 1
+          </div>
+          <div class="font-size-controls">
+            <span style="font-size: 11px; color: var(--text-muted); margin-right: 4px;">Font:</span>
+            <button class="font-btn" onclick="setFontSize('sm')">A-</button>
+            <button class="font-btn" onclick="setFontSize('md')">A</button>
+            <button class="font-btn" onclick="setFontSize('lg')">A+</button>
+          </div>
+        </div>
+
+        <!-- Question Body -->
+        <div class="question-body" id="questionText">
+          Memuat pertanyaan...
+        </div>
+
+        <!-- Options List -->
+        <div class="options-list" id="optionsContainer">
+          <!-- Dynamically populated options -->
+        </div>
+
+        <!-- Bottom Navigation Controls -->
+        <div class="question-nav-bar">
+          <button id="prevButton" class="btn btn-secondary" onclick="prevQuestion()">
+            ← Sebelumnya
+          </button>
+
+          <button id="doubtButton" class="btn btn-doubt" onclick="toggleDoubt()">
+            <span>☆</span> Ragu-Ragu
+          </button>
+
+          <button id="nextButton" class="btn btn-primary" onclick="nextQuestion()">
+            Berikutnya →
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Right Question Palette Pane (Drawer on Mobile) -->
+    <aside class="palette-pane" id="palettePane">
+      <div class="palette-header">
+        <span>Daftar Nomor Soal</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="badge badge-info" id="answeredBadgeCount">0 / 0</span>
+          <button class="palette-close-btn" onclick="closePaletteDrawer()">&times;</button>
+        </div>
+      </div>
+
+      <div class="palette-grid" id="paletteGrid">
+        <!-- Question number buttons 1, 2, 3... -->
+      </div>
+
+      <div class="palette-footer">
+        <div class="legend-item">
+          <div class="legend-dot green"></div>
+          <span>Sudah Dijawab</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot yellow"></div>
+          <span>Ragu-Ragu</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot gray"></div>
+          <span>Belum Dijawab</span>
+        </div>
+        <div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed #cbd5e1; font-size: 11px; color: var(--text-muted);">
+          Total Soal: <strong id="totalQuestionsCount">0</strong> Butir
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ========================================================
+       OVERLAY: KAMERA PENGAWASAN WAJIB AKTIF (CAMERA REQUIRED)
+       ======================================================== -->
+  <div class="camera-blocker-overlay" id="cameraBlockerOverlay">
+    <div class="camera-blocker-card">
+      <div class="camera-icon-wrapper">
+        📷
+      </div>
+      <h2 class="camera-blocker-title">Akses Kamera Depan Diperlukan!</h2>
+      <p class="camera-blocker-desc">
+        Aplikasi mendeteksi izin kamera depan belum aktif atau kamera tertutup/terputus.
+        Pengawasan kamera otomatis mengambil foto terkompresi setiap 30 menit demi kejujuran ujian.
+      </p>
+
+      <!-- Insecure context alert if on mobile HTTP -->
+      <div id="examHttpsAlert" style="display: none; background: #fffbeb; border: 1px solid #f59e0b; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 13px; text-align: left; color: #92400e;">
+        <strong>Perhatian Pengguna Handphone:</strong>
+        <p style="margin: 4px 0 8px;">Browser ponsel memblokir kamera jika belum menggunakan HTTPS. Klik tombol di bawah untuk beralih ke versi aman:</p>
+        <a id="examHttpsLink" href="#" class="btn btn-primary btn-sm" style="display: block; text-align: center; font-weight: 700;">
+          🔒 Buka dengan HTTPS (Port 3001) →
+        </a>
+      </div>
+
+      <div class="camera-guide-steps">
+        <strong>Langkah Mengaktifkan Kamera:</strong>
+        <ol>
+          <li>Ketuk ikon gembok / perizinan di bilah alamat peramban (URL browser).</li>
+          <li>Ubah izin <strong>Camera / Kamera</strong> menjadi <strong>Allow / Izinkan</strong>.</li>
+          <li>Ketuk tombol <strong>Aktifkan Kamera Sekarang</strong> di bawah ini.</li>
+        </ol>
+      </div>
+
+      <button class="btn btn-primary" id="retryCameraBtn" style="padding: 13px 20px; font-size: 15px; font-weight: 700; width: 100%; border-radius: 8px;" onclick="retryCameraAccess(event)">
+        🔄 Aktifkan Kamera Sekarang
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       MODAL: PERINGATAN KECURANGAN (CHEATING WARNING MODAL)
+       ======================================================== -->
+  <div class="cheat-alert-modal" id="cheatWarningModal">
+    <div class="cheat-alert-card">
+      <div style="font-size: 44px; margin-bottom: 8px;">⚠️</div>
+      <h3 style="color: #dc2626; font-size: 19px; font-weight: 800; margin-bottom: 6px;">PERINGATAN KECURANGAN!</h3>
+      <div class="cheat-badge-count" id="cheatCounterBadge">
+        Pelanggaran ke-1
+      </div>
+      <p style="font-size: 13px; color: #334155; line-height: 1.5; margin-bottom: 6px;">
+        Aktivitas mencurigakan terdeteksi oleh sistem pengawas:
+      </p>
+      <div style="background: #fef2f2; border: 1px solid #fee2e2; border-radius: 8px; padding: 10px; font-size: 13px; font-weight: 700; color: #b91c1c; margin-bottom: 16px;" id="cheatReasonText">
+        Pindah tab / aplikasi lain
+      </div>
+      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 18px;">
+        Setiap pelanggaran tercatat di Dashboard Pengawas. Jika Anda melampaui batas pelanggaran, ujian akan <strong>OTOMATIS TERKUNCI</strong>.
+      </p>
+      <button class="btn btn-danger" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 700; border-radius: 8px;" onclick="dismissCheatWarning()">
+        Saya Mengerti & Kembali ke Ujian
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       OVERLAY: UJIAN TERKUNCI KARENA KECURANGAN (LOCKED)
+       ======================================================== -->
+  <div class="camera-blocker-overlay" id="lockExamOverlay">
+    <div class="camera-blocker-card" style="border: 3px solid #ef4444;">
+      <div class="camera-icon-wrapper" style="background: #fee2e2; color: #dc2626;">
+        🔒
+      </div>
+      <h2 style="font-size: 20px; font-weight: 800; color: #991b1b; margin-bottom: 8px;">UJIAN ANDA TELAH DIKUNCI!</h2>
+      <p style="font-size: 13px; color: #475569; line-height: 1.5; margin-bottom: 16px;">
+        Sistem CBT telah mengunci sesi ujian Anda karena terdeteksi melakukan pelanggaran kecurangan melebihi batas toleransi.
+      </p>
+      <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 12px; font-size: 12px; color: #334155; margin-bottom: 16px;">
+        Silakan hubungi <strong>Proktor / Pengawas Ujian</strong> di ruangan Anda untuk pembukaan kunci sesi ujian.
+      </div>
+      <button class="btn btn-secondary" onclick="window.location.reload()" style="width: 100%; padding: 12px;">
+        Periksa Status Kunci
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       MODAL: KONFIRMASI SELESAI UJIAN (IN-DOM SAFE CONFIRMATION)
+       ======================================================== -->
+  <div class="cheat-alert-modal" id="confirmFinishModal">
+    <div class="cheat-alert-card" style="border-color: #2563eb; max-width: 480px;">
+      <div style="font-size: 42px; margin-bottom: 8px;">📋</div>
+      <h3 style="color: #1e3a8a; font-size: 20px; font-weight: 800; margin-bottom: 6px;">Konfirmasi Selesai Ujian</h3>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+        Pastikan seluruh jawaban Anda telah diperiksa sebelum mengumpulkan ujian.
+      </p>
+
+      <!-- Status Summary Grid -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px;">
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 6px;">
+          <div style="font-size: 20px; font-weight: 800; color: #16a34a;" id="modalAnsweredCount">0</div>
+          <div style="font-size: 11px; color: #15803d; font-weight: 600;">Dijawab</div>
+        </div>
+        <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 6px;">
+          <div style="font-size: 20px; font-weight: 800; color: #d97706;" id="modalDoubtCount">0</div>
+          <div style="font-size: 11px; color: #b45309; font-weight: 600;">Ragu-Ragu</div>
+        </div>
+        <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px 6px;">
+          <div style="font-size: 20px; font-weight: 800; color: #dc2626;" id="modalUnansweredCount">0</div>
+          <div style="font-size: 11px; color: #b91c1c; font-weight: 600;">Belum Dijawab</div>
+        </div>
+      </div>
+
+      <div id="modalWarningNote" style="display: none; background: #fff1f2; border: 1px dashed #fda4af; border-radius: 8px; padding: 10px; font-size: 12px; color: #9f1239; margin-bottom: 18px; text-align: left;">
+        ⚠️ Masih ada soal yang belum dijawab atau bertanda ragu-ragu.
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <button class="btn btn-secondary" style="padding: 12px; font-weight: 700; border-radius: 8px;" onclick="cancelFinishExam()">
+          ← Kembali Mengerjakan
+        </button>
+        <button class="btn btn-success" id="confirmFinishSubmitBtn" style="padding: 12px; font-weight: 700; border-radius: 8px;" onclick="submitFinishExam()">
+          Ya, Selesai Ujian ✓
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Socket.io -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/exam.js"></script>
+</body>
+</html>

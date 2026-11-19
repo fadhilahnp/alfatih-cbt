@@ -1,0 +1,237 @@
+/* Print Stylesheet for Student Exam Cards (Kartu Ujian Siswa) */
+
+@page {
+  size: A4 portrait;
+  margin: 10mm;
+}
+
+body.print-body {
+  background: #f1f5f9;
+  margin: 0;
+  padding: 20px;
+  font-family: 'Arial', sans-serif;
+  color: #111827;
+}
+
+.no-print {
+  display: block;
+}
+
+.print-controls-bar {
+  background: white;
+  padding: 16px 24px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Cards Grid Layout (2 cards per row) */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+}
+
+.exam-card-item {
+  background: white;
+  border: 1.5px dashed #475569;
+  border-radius: 8px;
+  padding: 14px 16px;
+  box-sizing: border-box;
+  page-break-inside: avoid;
+  position: relative;
+  font-size: 11px;
+}
+
+/* Card Header */
+.card-header-kop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 2px solid #000;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.school-logo-box {
+  width: 44px;
+  height: 44px;
+  background: #1e3a8a;
+  color: white;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.kop-text {
+  flex: 1;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.kop-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #0f172a;
+}
+
+.kop-sub {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e40af;
+}
+
+.kop-year {
+  font-size: 9.5px;
+  color: #475569;
+}
+
+/* Card Body Layout */
+.card-body-content {
+  display: flex;
+  gap: 12px;
+}
+
+.photo-placeholder-box {
+  width: 75px;
+  height: 95px;
+  border: 1px solid #94a3b8;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: #64748b;
+  text-align: center;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+
+.student-data-table {
+  flex: 1;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.student-data-table td {
+  padding: 3px 0;
+  font-size: 11px;
+  vertical-align: top;
+}
+
+.student-data-table td.label-col {
+  width: 90px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.student-data-table td.colon-col {
+  width: 10px;
+}
+
+.student-data-table td.value-col {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* Monospace highlight for Username & Password */
+.credential-badge {
+  display: inline-block;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-weight: 800;
+  font-size: 12px;
+  color: #1e3a8a;
+  letter-spacing: 0.05em;
+}
+
+/* Card Footer */
+.card-footer-sign {
+  margin-top: 10px;
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.barcode-mockup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.barcode-lines {
+  height: 22px;
+  width: 100px;
+  background: repeating-linear-gradient(
+    90deg,
+    #000,
+    #000 2px,
+    #fff 2px,
+    #fff 4px,
+    #000 4px,
+    #000 5px,
+    #fff 5px,
+    #fff 8px
+  );
+}
+
+.barcode-text {
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  font-family: monospace;
+  margin-top: 2px;
+}
+
+.sign-box {
+  text-align: center;
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.sign-space {
+  height: 24px;
+}
+
+.sign-name {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* Print Media Query */
+@media print {
+  body.print-body {
+    background: transparent !important;
+    padding: 0 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .cards-grid {
+    gap: 12px !important;
+  }
+
+  .exam-card-item {
+    border: 1.5px dashed #000 !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

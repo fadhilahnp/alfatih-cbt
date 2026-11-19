@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Konfirmasi Ujian Siswa - CBT AL-FATIH</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    body {
+      background: #f1f5f9;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .top-nav {
+      background: #0f172a;
+      color: white;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .confirm-container {
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 0 16px;
+      width: 100%;
+    }
+    .camera-test-box {
+      width: 100%;
+      max-width: 260px;
+      height: 180px;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+      border: 3px solid #10b981;
+      margin: 0 auto 14px;
+    }
+    .camera-test-box video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 20px;
+    }
+
+    /* Mobile Friendly Styles */
+    @media (max-width: 768px) {
+      .top-nav {
+        padding: 10px 14px;
+      }
+      .top-nav h1, .top-nav .brand-title {
+        font-size: 14px !important;
+      }
+      .confirm-container {
+        margin: 12px auto;
+        padding: 0 12px;
+      }
+      .main-grid {
+        grid-template-columns: 1fr; /* Stack vertically on phone */
+        gap: 16px;
+      }
+      .card {
+        padding: 18px 14px;
+        border-radius: 12px;
+      }
+      .btn {
+        padding: 12px 18px;
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="top-nav">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="font-size: 22px;">🎓</div>
+      <div>
+        <div style="font-weight: 800; font-size: 15px;" class="brand-title">CBT AL-FATIH</div>
+        <div style="font-size: 11px; color: #94a3b8;">Ujian Berbasis Komputer & HP</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span id="studentNavName" style="font-size: 13px; font-weight: 600;">👨‍🎓 Memuat...</span>
+      <button onclick="handleStudentLogout()" class="btn btn-secondary btn-sm" style="background: #1e293b; color: #ef4444; border-color: #334155; padding: 6px 10px;">Keluar</button>
+    </div>
+  </header>
+
+  <div class="confirm-container">
+
+    <!-- Insecure HTTP on Mobile Warning Banner (If applicable) -->
+    <div id="httpsWarningBanner" style="display: none; background: #fffbeb; border: 2px solid #f59e0b; border-radius: 12px; padding: 16px; margin-bottom: 20px; text-align: center;">
+      <div style="font-size: 26px; margin-bottom: 4px;">⚠️</div>
+      <h3 style="color: #92400e; font-size: 16px; font-weight: 800;">Akses Kamera di Handphone Memerlukan HTTPS</h3>
+      <p style="font-size: 13px; color: #78350f; margin: 8px 0 14px;">
+        Browser ponsel (Chrome Android & Safari iOS) membatasi izin kamera hanya pada sambungan aman (HTTPS). Silakan klik tombol di bawah untuk membuka versi HTTPS:
+      </p>
+      <a id="httpsSwitchBtn" href="#" class="btn btn-primary" style="display: inline-flex; padding: 12px 24px; font-weight: 800; font-size: 14px; border-radius: 8px;">
+        🔒 Buka dengan HTTPS (Port 3001) →
+      </a>
+      <div style="font-size: 11px; color: #92400e; margin-top: 8px;">
+        *Catatan: Jika muncul peringatan keamanan sertifikat di peramban, pilih <strong>Lanjutan (Advanced)</strong> lalu <strong>Lanjutkan / Proceed</strong>.
+      </div>
+    </div>
+
+    <!-- Student Profile Card -->
+    <div class="card" style="margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h2 style="font-size: 18px; font-weight: 800;" id="dispStudentName">-</h2>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+            NIS: <strong id="dispNis" style="color: #1e40af;">-</strong> •
+            Kelas: <strong id="dispClass">-</strong> •
+            Sesi: <span id="dispSession">-</span>
+          </p>
+        </div>
+        <span class="badge badge-success" style="font-size: 12px; padding: 5px 12px;">Peserta Terverifikasi</span>
+      </div>
+    </div>
+
+    <!-- Main Grid: Exam List & Camera Test -->
+    <div class="main-grid">
+
+      <!-- Left Column: Available Exams -->
+      <div>
+        <h3 style="font-size: 16px; font-weight: 800; margin-bottom: 12px;">Daftar Ujian Tersedia:</h3>
+        <div id="examsListContainer">
+          <p style="color: var(--text-muted); font-size: 14px;">Memeriksa jadwal ujian...</p>
+        </div>
+      </div>
+
+      <!-- Right Column: Camera Check & Instructions -->
+      <div>
+        <!-- Camera Check Card -->
+        <div class="card" style="text-align: center; margin-bottom: 16px;">
+          <h4 style="font-size: 15px; font-weight: 700; margin-bottom: 4px;">Pemeriksaan Kamera Depan</h4>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;">
+            Kamera depan wajib aktif untuk pengawasan foto berkala setiap 30 menit.
+          </p>
+
+          <div class="camera-test-box">
+            <video id="testVideo" autoplay playsinline webkit-playsinline muted></video>
+            <div id="camStatusBadge" style="position: absolute; bottom: 6px; left: 0; right: 0; font-size: 11px; background: rgba(0,0,0,0.75); color: #f87171; padding: 4px 6px;">
+              Kamera belum diaktifkan
+            </div>
+          </div>
+
+          <button id="activateCamBtn" class="btn btn-primary" onclick="startCameraCheck(event)" style="width: 100%; padding: 13px; font-size: 15px; font-weight: 700; border-radius: 8px;">
+            📷 Tekan untuk Aktifkan Kamera Depan
+          </button>
+
+          <div id="camErrorHelp" style="display: none; margin-top: 12px; font-size: 12px; text-align: left; background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 8px;">
+            <strong>Izin Kamera Ditolak / Tidak Terdeteksi:</strong>
+            <p style="margin-top: 4px;">Harap izinkan akses kamera di ikon gembok peramban (URL), lalu ketuk kembali tombol di atas.</p>
+          </div>
+        </div>
+
+        <!-- Anti-Cheat Rules Box -->
+        <div class="card" style="background: #fffbeb; border-color: #fde68a;">
+          <h4 style="font-size: 13px; font-weight: 700; color: #92400e; margin-bottom: 6px;">⚠️ Tata Tertib Anti-Curang:</h4>
+          <ul style="font-size: 12px; color: #78350f; padding-left: 18px; line-height: 1.6;">
+            <li>Jangan berpindah ke tab atau aplikasi lain saat ujian.</li>
+            <li>Dilarang menyalin (copy) pertanyaan soal.</li>
+            <li>Ujian harus berada di layar penuh (*Fullscreen*).</li>
+            <li>Setiap pelanggaran tercatat dan ujian akan otomatis terkunci jika melampaui batas toleransi.</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/js/admin.js"></script>
+  <script>
+    let cameraReady = false;
+    let cameraStream = null;
+
+    // Check Secure Context on Mobile
+    function checkSecureContext() {
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const isHttps = window.location.protocol === 'https:';
+
+      if (!isLocal && !isHttps) {
+        // Mobile phone accessing via HTTP IP (e.g. http://192.168.1.5:3000)
+        const banner = document.getElementById('httpsWarningBanner');
+        const switchBtn = document.getElementById('httpsSwitchBtn');
+        const httpsUrl = `https://${window.location.hostname}:3001/student/confirm`;
+        switchBtn.href = httpsUrl;
+        banner.style.display = 'block';
+      }
+    }
+
+    // Polyfill getUserMedia for all mobile browsers
+    function getCameraMedia(constraints) {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        return navigator.mediaDevices.getUserMedia(constraints);
+      }
+      const legacyGetUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia || navigator.getUserMedia;
+      if (legacyGetUserMedia) {
+        return new Promise((resolve, reject) => {
+          legacyGetUserMedia.call(navigator, constraints, resolve, reject);
+        });
+      }
+      return Promise.reject(new Error('Browser ini memblokir kamera karena koneksi bukan HTTPS'));
+    }
+
+    // Camera test with progressive fallback
+    async function startCameraCheck(e) {
+      if (e) e.preventDefault();
+
+      const video = document.getElementById('testVideo');
+      const badge = document.getElementById('camStatusBadge');
+      const btn = document.getElementById('activateCamBtn');
+      const help = document.getElementById('camErrorHelp');
+
+      btn.disabled = true;
+      btn.textContent = 'Meminta Izin Kamera...';
+      badge.textContent = 'Meminta izin kamera peramban...';
+      badge.style.color = '#38bdf8';
+      help.style.display = 'none';
+
+      try {
+        let stream = null;
+
+        // Constraint Attempt 1: Front camera (user) ideal 640x480
+        try {
+          stream = await getCameraMedia({
+            video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+            audio: false
+          });
+        } catch (e1) {
+          console.warn('Attempt 1 failed, trying attempt 2:', e1);
+        }
+
+        // Constraint Attempt 2: Simple user facing
+        if (!stream) {
+          try {
+            stream = await getCameraMedia({
+              video: { facingMode: 'user' },
+              audio: false
+            });
+          } catch (e2) {
+            console.warn('Attempt 2 failed, trying attempt 3:', e2);
+          }
+        }
+
+        // Constraint Attempt 3: Any video device
+        if (!stream) {
+          stream = await getCameraMedia({
+            video: true,
+            audio: false
+          });
+        }
+
+        cameraStream = stream;
+        video.srcObject = stream;
+        video.setAttribute('playsinline', '');
+        video.setAttribute('webkit-playsinline', '');
+        video.muted = true;
+
+        try {
+          await video.play();
+        } catch (playErr) {
+          console.log('Video play error:', playErr);
+        }
+
+        cameraReady = true;
+        badge.textContent = '🟢 Kamera Siap & Berfungsi';
+        badge.style.color = '#4ade80';
+        btn.textContent = '✅ Kamera Depan Aktif';
+        btn.className = 'btn btn-success';
+        btn.disabled = false;
+        showToast('Kamera depan berhasil diaktifkan!', 'success');
+
+      } catch (err) {
+        console.error('Camera error:', err);
+        cameraReady = false;
+        badge.textContent = '🔴 Akses Kamera Gagal';
+        badge.style.color = '#f87171';
+        btn.textContent = '🔄 Coba Lagi Izinkan Kamera';
+        btn.className = 'btn btn-danger';
+        btn.disabled = false;
+        help.style.display = 'block';
+
+        if (err.message && err.message.includes('HTTPS')) {
+          help.innerHTML = `<strong>Pemberitahuan Handphone:</strong> Browser ponsel memblokir kamera tanpa HTTPS. Silakan klik tombol <strong>Buka dengan HTTPS (Port 3001)</strong> di atas.`;
+        }
+      }
+    }
+
+    async function checkStudentAuth() {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        if (!data.success || data.user.type !== 'student') {
+          window.location.href = '/';
+          return;
+        }
+
+        const s = data.user;
+        document.getElementById('studentNavName').textContent = s.name;
+        document.getElementById('dispStudentName').textContent = s.name;
+        document.getElementById('dispNis').textContent = s.nis;
+        document.getElementById('dispClass').textContent = s.class_name;
+        document.getElementById('dispSession').textContent = s.session_name || 'Sesi 1';
+
+        checkSecureContext();
+        await loadAvailableExams();
+
+      } catch (e) {
+        window.location.href = '/';
+      }
+    }
+
+    async function loadAvailableExams() {
+      const container = document.getElementById('examsListContainer');
+      try {
+        const res = await fetch('/api/exam/available');
+        const json = await res.json();
+        const exams = json.data;
+
+        container.innerHTML = '';
+        if (exams.length === 0) {
+          container.innerHTML = `
+            <div class="card" style="text-align: center; color: var(--text-muted); padding: 30px;">
+              Tidak ada jadwal ujian aktif untuk kelas Anda saat ini.
+            </div>
+          `;
+          return;
+        }
+
+        exams.forEach(e => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.style.marginBottom = '14px';
+
+          const isFinished = e.student_status === 'FINISHED';
+          const isInProgress = e.student_status === 'IN_PROGRESS';
+          const isLocked = e.student_status === 'LOCKED';
+
+          card.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 10px;">
+              <div>
+                <h4 style="font-size: 15px; font-weight: 800;">${e.title}</h4>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                  ${e.subject} • ${e.total_questions} Soal
+                </div>
+              </div>
+              <span class="badge ${isFinished ? 'badge-success' : isLocked ? 'badge-danger' : 'badge-info'}" style="font-size: 11px;">
+                ${isFinished ? 'Selesai' : isLocked ? 'Terkunci' : 'Tersedia'}
+              </span>
+            </div>
+
+            <div style="display: flex; gap: 12px; font-size: 12px; color: #475569; margin-bottom: 14px; background: #f8fafc; padding: 8px 12px; border-radius: 8px; flex-wrap: wrap;">
+              <div>⏱️ <strong>${e.duration_minutes} Mnt</strong></div>
+              <div>📷 Foto: <strong>${e.snapshot_interval_minutes} Mnt</strong></div>
+              <div>🔐 <strong>${e.token ? 'Pakai Token' : 'Tanpa Token'}</strong></div>
+            </div>
+
+            ${isFinished ? `
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 13px; font-weight: 700; color: #15803d;">Ujian Selesai. Nilai: ${e.student_score}</span>
+                <a href="/student/finish?session_id=${e.session_id}" class="btn btn-secondary btn-sm">Bukti Selesai</a>
+              </div>
+            ` : isLocked ? `
+              <div style="color: #b91c1c; font-size: 12px; font-weight: 700;">
+                ⚠️ Ujian terkunci karena melebihi batas kecurangan. Hubungi pengawas.
+              </div>
+            ` : `
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                ${e.token ? `
+                  <input type="text" id="token_input_${e.id}" class="form-control" placeholder="Token Ujian" style="flex: 1; min-width: 140px; text-transform: uppercase; font-weight: 700;" value="">
+                ` : ''}
+                <button class="btn btn-primary" onclick="startExamAction(${e.id}, ${Boolean(e.token)})" style="flex: 1; padding: 11px 16px; white-space: nowrap;">
+                  ${isInProgress ? 'Lanjutkan Ujian →' : 'Mulai Ujian →'}
+                </button>
+              </div>
+            `}
+          `;
+
+          container.appendChild(card);
+        });
+
+      } catch (err) {
+        container.innerHTML = '<div class="card" style="color: red;">Gagal memuat jadwal ujian.</div>';
+      }
+    }
+
+    async function startExamAction(scheduleId, hasToken) {
+      if (!cameraReady) {
+        const proceed = confirm('Kamera depan belum aktif. Harap tekan tombol "Tekan untuk Aktifkan Kamera Depan" terlebih dahulu untuk mengizinkan akses kamera.');
+        if (proceed) {
+          await startCameraCheck();
+          if (!cameraReady) return;
+        } else {
+          return;
+        }
+      }
+
+      let token = '';
+      if (hasToken) {
+        const tokenInput = document.getElementById(`token_input_${scheduleId}`);
+        token = tokenInput ? tokenInput.value.trim() : '';
+        if (!token) {
+          showToast('Harap masukkan token ujian!', 'warning');
+          return;
+        }
+      }
+
+      try {
+        const res = await fetch('/api/exam/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ schedule_id: scheduleId, token })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          window.location.href = `/student/exam?session_id=${data.sessionId}`;
+        } else {
+          showToast(data.message, 'danger');
+        }
+      } catch (e) {
+        showToast('Gagal memulai ujian: ' + e.message, 'danger');
+      }
+    }
+
+    async function handleStudentLogout() {
+      if (confirm('Keluar dari sistem CBT?')) {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        window.location.href = '/';
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', checkStudentAuth);
+  </script>
+</body>
+</html>

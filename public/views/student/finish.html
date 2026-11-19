@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ujian Selesai - CBT AL-FATIH</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    body {
+      background: #f1f5f9;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .finish-card {
+      background: white;
+      border-radius: 20px;
+      padding: 36px 30px;
+      max-width: 520px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+      border: 1px solid var(--border);
+    }
+    @media (max-width: 768px) {
+      .finish-card {
+        padding: 24px 18px;
+        border-radius: 14px;
+      }
+      .score-number {
+        font-size: 38px !important;
+      }
+    }
+    .check-icon-circle {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: #dcfce7;
+      color: #16a34a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      margin: 0 auto 20px;
+      border: 4px solid #bbf7d0;
+    }
+    .score-box {
+      background: #eff6ff;
+      border: 2px solid #bfdbfe;
+      border-radius: 14px;
+      padding: 20px;
+      margin: 24px 0;
+    }
+    .score-number {
+      font-size: 48px;
+      font-weight: 900;
+      color: #1e40af;
+      line-height: 1;
+    }
+    .score-details-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px dashed #bfdbfe;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="finish-card">
+    <div class="check-icon-circle">✓</div>
+    <h1 style="font-size: 24px; font-weight: 800; color: #0f172a;">Ujian Berhasil Diselesaikan!</h1>
+    <p style="font-size: 14px; color: #475569; margin-top: 6px;" id="examTitleText">
+      Terima kasih telah mengikuti ujian dengan jujur dan tertib.
+    </p>
+
+    <!-- Score Box (dynamically rendered) -->
+    <div id="scoreContainer">
+      <div class="score-box">
+        <div style="font-size: 13px; font-weight: 700; color: #3b82f6; text-transform: uppercase; letter-spacing: 0.05em;">
+          Nilai Akhir Anda
+        </div>
+        <div class="score-number" id="finalScoreVal">-</div>
+        <div class="score-details-grid">
+          <div>
+            <div style="font-size: 18px; font-weight: 800; color: #16a34a;" id="correctVal">-</div>
+            <div style="color: #64748b;">Benar</div>
+          </div>
+          <div>
+            <div style="font-size: 18px; font-weight: 800; color: #dc2626;" id="wrongVal">-</div>
+            <div style="color: #64748b;">Salah</div>
+          </div>
+          <div>
+            <div style="font-size: 18px; font-weight: 800; color: #64748b;" id="unansweredVal">-</div>
+            <div style="color: #64748b;">Kosong</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 12px; margin-top: 24px;">
+      <a href="/student/confirm" class="btn btn-secondary" style="flex: 1; padding: 12px;">
+        ← Daftar Jadwal
+      </a>
+      <button onclick="logout()" class="btn btn-primary" style="flex: 1; padding: 12px;">
+        Keluar / Selesai
+      </button>
+    </div>
+  </div>
+
+  <script>
+    async function loadSessionFinish() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionId = urlParams.get('session_id');
+
+      if (!sessionId) {
+        window.location.href = '/student/confirm';
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/exam/session/${sessionId}`);
+        const data = await res.json();
+
+        if (data.success) {
+          const s = data.session;
+          document.getElementById('examTitleText').textContent = `${s.examTitle} (${s.subject})`;
+
+          if (s.showResult) {
+            document.getElementById('finalScoreVal').textContent = s.score !== null ? s.score : 0;
+            document.getElementById('correctVal').textContent = s.correctCount !== null ? s.correctCount : 0;
+            document.getElementById('wrongVal').textContent = s.wrongCount !== null ? s.wrongCount : 0;
+            document.getElementById('unansweredVal').textContent = s.unansweredCount !== null ? s.unansweredCount : 0;
+          } else {
+            document.getElementById('scoreContainer').innerHTML = `
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 20px 0; font-size: 14px; color: #475569;">
+                ℹ️ Jawaban Anda telah tersimpan dengan aman di server. Hasil dan rekap nilai akan diumumkan kemudian oleh pihak sekolah / pengawas.
+              </div>
+            `;
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function logout() {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/';
+    }
+
+    window.addEventListener('DOMContentLoaded', loadSessionFinish);
+  </script>
+</body>
+</html>

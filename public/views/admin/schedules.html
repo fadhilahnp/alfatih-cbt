@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atur Jadwal Ujian - CBT AL-FATIH</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-icon">🎓</div>
+        <div>
+          <div style="font-weight: 800; font-size: 16px; color: white;">CBT AL-FATIH</div>
+          <div style="font-size: 11px; color: #94a3b8;">Sistem Ujian Terpadu</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/admin/dashboard" class="nav-item"><span class="icon">📊</span> Dashboard</a>
+        <a href="/admin/students" class="nav-item"><span class="icon">👨‍🎓</span> Data Siswa & Kartu</a>
+        <a href="/admin/questions" class="nav-item"><span class="icon">📝</span> Bank Soal & Excel</a>
+        <a href="/admin/schedules" class="nav-item active"><span class="icon">📅</span> Atur Jadwal Ujian</a>
+        <a href="/admin/monitoring" class="nav-item"><span class="icon">🛡️</span> Live Monitoring & Cam</a>
+        <a href="/admin/results" class="nav-item"><span class="icon">📈</span> Rekap Nilai Siswa</a>
+      </nav>
+      <div class="sidebar-footer">
+        <span style="font-size: 12px; color: #94a3b8;">Admin CBT</span>
+        <button onclick="handleLogout()" class="btn btn-secondary btn-sm" style="background:#1e293b; color:#ef4444; border-color:#334155;">Keluar</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <h2 style="font-size: 20px;">Atur Jadwal Pelaksanaan Ujian</h2>
+          <p style="font-size: 13px; color: var(--text-muted);">Tentukan waktu, durasi, token masuk, aturan anti-curang, dan interval foto kamera proctoring (30 menit)</p>
+        </div>
+        <div>
+          <button onclick="openCreateScheduleModal()" class="btn btn-primary">
+            + Buat Jadwal Ujian Baru
+          </button>
+        </div>
+      </header>
+
+      <div class="page-content">
+        <div class="card">
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Judul Ujian & Mapel</th>
+                  <th>Kelas Peserta</th>
+                  <th>Rentang Waktu</th>
+                  <th>Durasi</th>
+                  <th>Token</th>
+                  <th>Interval Foto</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="schedulesTableBody">
+                <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Memuat jadwal ujian...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal Tambah / Edit Jadwal Ujian -->
+  <div class="modal-backdrop" id="scheduleModal">
+    <div class="modal-dialog" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3 id="scheduleModalTitle" style="font-size: 18px; font-weight: 700;">Buat Jadwal Ujian Baru</h3>
+        <button onclick="closeScheduleModal()" style="border: none; background: none; font-size: 20px; cursor: pointer;">&times;</button>
+      </div>
+      <form id="scheduleForm" onsubmit="saveSchedule(event)">
+        <div class="modal-body">
+          <input type="hidden" id="scheduleId">
+          <div class="form-group">
+            <label class="form-label">Nama / Judul Ujian *</label>
+            <input type="text" id="schTitle" class="form-control" required placeholder="Contoh: Ujian Akhir Semester - Matematika">
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Pilih Bank Soal *</label>
+              <select id="schBankId" class="form-select" required></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Kelas Peserta *</label>
+              <input type="text" id="schClasses" class="form-control" value="ALL" placeholder="ALL atau XII-MIPA-1,XII-MIPA-2">
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Waktu Mulai Ujian *</label>
+              <input type="datetime-local" id="schStartTime" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Waktu Selesai Ujian *</label>
+              <input type="datetime-local" id="schEndTime" class="form-control" required>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Durasi Pengerjaan (Menit) *</label>
+              <input type="number" id="schDuration" class="form-control" value="60" required min="5">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Token Masuk Ujian</label>
+              <input type="text" id="schToken" class="form-control" placeholder="Contoh: ALF2026 (Kosongkan jika tanpa token)" style="text-transform: uppercase;">
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label">Interval Foto Kamera (Menit) *</label>
+              <input type="number" id="schSnapshotInterval" class="form-control" value="30" required min="1">
+              <small style="color: var(--text-muted); font-size: 11px;">Default 30 menit. Kompresi otomatis aktif.</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Batas Maksimal Pelanggaran *</label>
+              <input type="number" id="schMaxViolations" class="form-control" value="5" required min="1">
+              <small style="color: var(--text-muted); font-size: 11px;">Ujian terkunci jika melebihi batas ini.</small>
+            </div>
+          </div>
+          <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-top: 6px;">
+            <div style="font-weight: 700; font-size: 13px; margin-bottom: 8px;">Pengaturan Tambahan:</div>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 13px;">
+              <label style="display: flex; align-items: center; gap: 6px;">
+                <input type="checkbox" id="schRandomQ" checked> Acak Urutan Soal
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px;">
+                <input type="checkbox" id="schRandomOpt" checked> Acak Urutan Pilihan
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px;">
+                <input type="checkbox" id="schShowResult" checked> Tampilkan Nilai di Akhir
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeScheduleModal()">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan Jadwal Ujian</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/admin.js"></script>
+  <script>
+    let schedulesData = [];
+
+    async function loadBanksDropdown() {
+      try {
+        const res = await fetch('/api/admin/banks');
+        const json = await res.json();
+        const sel = document.getElementById('schBankId');
+        sel.innerHTML = '';
+        json.data.forEach(b => {
+          const opt = document.createElement('option');
+          opt.value = b.id;
+          opt.textContent = `${b.subject} (${b.code}) - ${b.real_question_count} Soal`;
+          sel.appendChild(opt);
+        });
+      } catch (e) {}
+    }
+
+    async function loadSchedules() {
+      const tbody = document.getElementById('schedulesTableBody');
+      try {
+        const res = await fetch('/api/admin/schedules');
+        const json = await res.json();
+        schedulesData = json.data;
+        tbody.innerHTML = '';
+
+        if (schedulesData.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Belum ada jadwal ujian.</td></tr>';
+          return;
+        }
+
+        schedulesData.forEach(s => {
+          const tr = document.createElement('tr');
+          const startStr = new Date(s.start_time).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
+          const endStr = new Date(s.end_time).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
+
+          tr.innerHTML = `
+            <td>
+              <div style="font-weight: 700; font-size: 14px;">${s.title}</div>
+              <div style="font-size: 12px; color: var(--text-muted);">${s.subject} (${s.bank_code})</div>
+            </td>
+            <td><span class="badge badge-info">${s.target_classes}</span></td>
+            <td style="font-size: 12px;">${startStr} s/d <br>${endStr}</td>
+            <td><strong>${s.duration_minutes} Mnt</strong></td>
+            <td><span class="badge badge-gray">${s.token || 'Tanpa Token'}</span></td>
+            <td><span class="badge badge-info">${s.snapshot_interval_minutes} Menit 📷</span></td>
+            <td>
+              <span class="badge ${s.is_active ? 'badge-success' : 'badge-danger'}">
+                ${s.is_active ? 'Aktif' : 'Non-Aktif'}
+              </span>
+            </td>
+            <td>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <a href="/admin/monitoring?schedule_id=${s.id}" class="btn btn-primary btn-sm">🔴 Monitor</a>
+                <button class="btn btn-secondary btn-sm" onclick="toggleScheduleActive(${s.id})">${s.is_active ? 'Nonaktifkan' : 'Aktifkan'}</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteSchedule(${s.id})">Hapus</button>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+      } catch (e) {
+        showToast('Gagal memuat jadwal ujian', 'danger');
+      }
+    }
+
+    function openCreateScheduleModal() {
+      document.getElementById('scheduleModalTitle').textContent = 'Buat Jadwal Ujian Baru';
+      document.getElementById('scheduleId').value = '';
+      document.getElementById('scheduleForm').reset();
+
+      const now = new Date();
+      const startIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      const endIso = new Date(now.getTime() + 24 * 60 * 60000 - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+
+      document.getElementById('schStartTime').value = startIso;
+      document.getElementById('schEndTime').value = endIso;
+      document.getElementById('schClasses').value = 'ALL';
+      document.getElementById('schDuration').value = '60';
+      document.getElementById('schSnapshotInterval').value = '30'; // 30 minutes default
+      document.getElementById('schMaxViolations').value = '5';
+      document.getElementById('schRandomQ').checked = true;
+      document.getElementById('schRandomOpt').checked = true;
+      document.getElementById('schShowResult').checked = true;
+
+      document.getElementById('scheduleModal').classList.add('active');
+    }
+
+    function closeScheduleModal() {
+      document.getElementById('scheduleModal').classList.remove('active');
+    }
+
+    async function saveSchedule(e) {
+      e.preventDefault();
+      const payload = {
+        title: document.getElementById('schTitle').value,
+        bank_id: document.getElementById('schBankId').value,
+        target_classes: document.getElementById('schClasses').value,
+        start_time: document.getElementById('schStartTime').value,
+        end_time: document.getElementById('schEndTime').value,
+        duration_minutes: document.getElementById('schDuration').value,
+        token: document.getElementById('schToken').value,
+        snapshot_interval_minutes: document.getElementById('schSnapshotInterval').value,
+        max_violations: document.getElementById('schMaxViolations').value,
+        randomize_questions: document.getElementById('schRandomQ').checked,
+        randomize_options: document.getElementById('schRandomOpt').checked,
+        show_result: document.getElementById('schShowResult').checked
+      };
+
+      try {
+        const res = await fetch('/api/admin/schedules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message, 'success');
+          closeScheduleModal();
+          loadSchedules();
+        } else {
+          showToast(data.message, 'danger');
+        }
+      } catch (err) {
+        showToast('Gagal menyimpan jadwal ujian', 'danger');
+      }
+    }
+
+    async function toggleScheduleActive(id) {
+      try {
+        const res = await fetch(`/api/admin/schedules/${id}/toggle`, { method: 'PATCH' });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message, 'success');
+          loadSchedules();
+        }
+      } catch (e) {
+        showToast('Gagal mengubah status', 'danger');
+      }
+    }
+
+    async function deleteSchedule(id) {
+      if (confirm('Hapus jadwal ujian ini beserta sesi peserta yang ada?')) {
+        try {
+          const res = await fetch(`/api/admin/schedules/${id}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (data.success) {
+            showToast(data.message, 'success');
+            loadSchedules();
+          }
+        } catch (e) {
+          showToast('Gagal menghapus jadwal', 'danger');
+        }
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await loadBanksDropdown();
+      await loadSchedules();
+    });
+  </script>
+</body>
+</html>
